@@ -1,0 +1,7 @@
+{
+  "project": "CalClick",
+  "phase": "auth-persistence",
+  "description": "Supabase Auth + 테이블 + RLS. 오늘 kcal 합계 영속화. 개인정보 동의/삭제권.",
+  "gate": { "rls": "tenant_isolation_verified", "today_sum": "persists_across_reload" },
+  "steps": []
+}

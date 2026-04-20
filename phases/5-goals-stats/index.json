@@ -1,0 +1,6 @@
+{
+  "project": "CalClick",
+  "phase": "goals-stats",
+  "description": "프로필 온보딩, BMR/TDEE, 목표 kcal, 주/월 그래프 (Recharts), 체중 로그.",
+  "steps": []
+}

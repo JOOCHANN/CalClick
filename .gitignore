@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env
+.env.local
+.DS_Store
+*.log
+coverage/
+playwright-report/
+test-results/
+harness_ref/
+harness_framework-main.zip
+
+# Phase 0 PoC outputs: results/는 재현 가능하므로 제외. images는 git-lfs 고려.
+phases/0-core-poc/eval/results/

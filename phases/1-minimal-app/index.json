@@ -1,0 +1,20 @@
+{
+  "project": "CalClick",
+  "phase": "minimal-app",
+  "description": "Next.js 15 + PWA + 단일 페이지 (사진 업로드 → /api/recognize → 결과 카드). 인증/DB 없음, localStorage.",
+  "gate": {
+    "dev_boots": "npm run dev 작동",
+    "build_passes": "npm run build 성공",
+    "lint_passes": "npm run lint 무오류",
+    "ios_camera": "iOS Safari에서 카메라 캡처 작동",
+    "vercel_deployed": "배포 URL 도달 가능"
+  },
+  "steps": [
+    { "step": 1, "name": "scaffold",     "status": "pending", "summary": "" },
+    { "step": 2, "name": "pwa-shell",    "status": "pending", "summary": "" },
+    { "step": 3, "name": "api-recognize","status": "pending", "summary": "" },
+    { "step": 4, "name": "capture-ui",   "status": "pending", "summary": "" },
+    { "step": 5, "name": "local-storage","status": "pending", "summary": "" },
+    { "step": 6, "name": "deploy",       "status": "pending", "summary": "" }
+  ]
+}

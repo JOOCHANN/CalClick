@@ -1,0 +1,7 @@
+{
+  "project": "CalClick",
+  "phase": "multi-food",
+  "description": "한상차림 다중 음식 UX (차별점). 결과 카드별 중량 슬라이더, 공유 인원 ÷N 토글.",
+  "gate": { "phase0_regression": "within_5pp", "share_split": "ui_works" },
+  "steps": []
+}

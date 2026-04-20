@@ -1,0 +1,7 @@
+{
+  "project": "CalClick",
+  "phase": "pwa-polish",
+  "description": "Service Worker 오프라인 촬영 큐잉, 아이콘/splash, Lighthouse ≥ 90, Playwright E2E.",
+  "gate": { "lighthouse_pwa": ">= 90", "e2e_capture_to_save": "< 10s" },
+  "steps": []
+}
