@@ -13,7 +13,7 @@
     { "step": 1, "name": "scaffold",     "status": "completed", "summary": "Next.js 16 + Tailwind v4 + shadcn(Radix/Nova) + Pretendard + lucide-react. lint/build green." },
     { "step": 2, "name": "pwa-shell",    "status": "completed", "summary": "manifest.webmanifest, PNG icons(192/512/maskable/apple-touch-180), layout metadata." },
     { "step": 3, "name": "api-recognize","status": "completed", "summary": "POST /api/recognize (GPT-4o Vision, zod, 3 vitest mock tests)." },
-    { "step": 4, "name": "capture-ui",   "status": "pending", "summary": "" },
+    { "step": 4, "name": "capture-ui",   "status": "completed", "summary": "카메라/파일 → resize 1024 → /api/recognize → 결과 카드 + 중량 슬라이더 + kcal (temp)." },
     { "step": 5, "name": "local-storage","status": "pending", "summary": "" },
     { "step": 6, "name": "deploy",       "status": "pending", "summary": "" }
   ]
