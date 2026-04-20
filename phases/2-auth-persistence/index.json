@@ -1,7 +1,20 @@
 {
   "project": "CalClick",
   "phase": "auth-persistence",
-  "description": "Supabase Auth + 테이블 + RLS. 오늘 kcal 합계 영속화. 개인정보 동의/삭제권.",
-  "gate": { "rls": "tenant_isolation_verified", "today_sum": "persists_across_reload" },
-  "steps": []
+  "description": "Supabase Auth + 정규화된 스키마 + RLS. Phase 1 localStorage → 서버 저장으로 전환. 개인정보 동의/삭제.",
+  "gate": {
+    "auth_email": "이메일 로그인 작동",
+    "rls_isolation": "타 유저 토큰으로 meals 접근 거부",
+    "today_sum": "새로고침/다른 브라우저에서도 오늘 kcal 유지",
+    "food_aliases": "LLM 음식명이 foods.food_id로 정규화되어 meal_items 저장",
+    "lint_build_test": "lint/build/test 전부 통과"
+  },
+  "steps": [
+    { "step": 1, "name": "supabase-setup",   "status": "pending", "summary": "프로젝트 생성 + env + 스키마 migration (profiles/meals/meal_items/foods/food_aliases) + RLS 정책" },
+    { "step": 2, "name": "auth-ui",          "status": "pending", "summary": "Supabase Auth 이메일 로그인 페이지 + 세션 미들웨어 + logout" },
+    { "step": 3, "name": "foods-seed",       "status": "pending", "summary": "Phase 1 하드코딩 kcal 맵 → foods 테이블 seed (TEMP_PHASE_1 제거)" },
+    { "step": 4, "name": "save-to-db",       "status": "pending", "summary": "/api/recognize 결과 → /api/meals POST로 meals + meal_items 저장 (food_aliases 경유 정규화)" },
+    { "step": 5, "name": "today-from-db",    "status": "pending", "summary": "오늘 kcal을 서버에서 조회. localStorage 폴백 제거" },
+    { "step": 6, "name": "privacy",          "status": "pending", "summary": "개인정보 동의 체크 + 계정 삭제(데이터 포함) 엔드포인트" }
+  ]
 }

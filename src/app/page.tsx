@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
 import { kcalFor } from "@/lib/kcal-temp";
 import { addMeal, todayTotalKcal } from "@/lib/storage";
+import { supabaseBrowser } from "@/services/supabase";
 import type { RecognitionResult } from "@/types/recognition";
 
 type Candidate = RecognitionResult["candidates"][number];
@@ -86,7 +87,16 @@ export default function Home() {
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">CalClick</h1>
-        <span className="text-xs text-neutral-500">한상 1장 · kcal</span>
+        <button
+          type="button"
+          onClick={async () => {
+            await supabaseBrowser().auth.signOut();
+            location.href = "/login";
+          }}
+          className="text-xs text-neutral-500 underline"
+        >
+          로그아웃
+        </button>
       </header>
 
       <section className="flex flex-col items-center py-4">
