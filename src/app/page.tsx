@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
 import { kcalFor } from "@/lib/kcal-temp";
-import { addMeal, todayTotalKcal } from "@/lib/storage";
+import { todayTotalKcal } from "@/lib/storage";
 import { supabaseBrowser } from "@/services/supabase";
 import type { RecognitionResult } from "@/types/recognition";
 
@@ -37,21 +37,39 @@ export default function Home() {
     () => 0,
   );
 
-  const onSave = () => {
+  const [saving, setSaving] = useState(false);
+  const onSave = async () => {
     if (!candidates) return;
-    const foods = candidates.map((c) => ({
-      name: c.name,
-      grams: c.editedGrams,
-      kcal: kcalFor(c.name, c.editedGrams),
-    }));
-    const totalKcal = foods.reduce((s, f) => s + f.kcal, 0);
-    addMeal({ foods, totalKcal });
-    window.dispatchEvent(new StorageEvent("storage", { key: "calclick.meals.v1" }));
-    setCandidates(null);
-    setFile(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    toast.success(`+${totalKcal} kcal 저장됨`);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidates: candidates.map((c) => ({ name: c.name, grams: c.editedGrams })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "unknown_foods") {
+          toast.error(`인식되지 않은 음식: ${data.unknown.join(", ")}`);
+        } else if (data.error === "unauthorized") {
+          toast.error("로그인이 필요합니다");
+          location.href = "/login";
+        } else {
+          toast.error("저장 실패");
+        }
+        return;
+      }
+      window.dispatchEvent(new StorageEvent("storage", { key: "calclick.meals.v1" }));
+      setCandidates(null);
+      setFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      toast.success(`+${data.total_kcal} kcal 저장됨`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,8 +176,8 @@ export default function Home() {
 
       {candidates && (
         <section className="flex flex-col gap-3">
-          <Button size="lg" onClick={onSave}>
-            오늘 식사에 저장
+          <Button size="lg" onClick={onSave} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "오늘 식사에 저장"}
           </Button>
           {candidates.map((c, i) => (
             <Card key={i}>
