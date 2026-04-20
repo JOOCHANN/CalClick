@@ -8,6 +8,10 @@ vi.mock("@/services/openai", () => ({
   }),
 }));
 
+vi.mock("@/services/foods", () => ({
+  findFoodByAlias: vi.fn(async () => null),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(image?: Blob): Request {

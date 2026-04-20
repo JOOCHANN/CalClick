@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
-import { kcalFor } from "@/lib/kcal-temp";
-import { todayTotalKcal } from "@/lib/storage";
 import { supabaseBrowser } from "@/services/supabase";
 import type { RecognitionResult } from "@/types/recognition";
 
@@ -20,9 +18,17 @@ function snap(g: number): number {
   return Math.max(50, Math.round(g / 50) * 50);
 }
 
-function subscribeStorage(cb: () => void): () => void {
-  window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
+function previewKcal(c: EditableCandidate): number | null {
+  if (c.kcal_per_100g == null) return null;
+  return Math.round((c.kcal_per_100g * c.editedGrams) / 100);
+}
+
+function todayRange(): { from: string; to: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { from: start.toISOString(), to: end.toISOString() };
 }
 
 export default function Home() {
@@ -31,15 +37,29 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [candidates, setCandidates] = useState<EditableCandidate[] | null>(null);
-  const todayKcal = useSyncExternalStore(
-    subscribeStorage,
-    () => todayTotalKcal(),
-    () => 0,
-  );
-
+  const [todayKcal, setTodayKcal] = useState<number>(0);
   const [saving, setSaving] = useState(false);
+
+  const fetchToday = useCallback(async () => {
+    const { from, to } = todayRange();
+    const res = await fetch(`/api/meals/today?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setTodayKcal(data.total_kcal ?? 0);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchToday();
+  }, [fetchToday]);
+
   const onSave = async () => {
     if (!candidates) return;
+    const unknown = candidates.filter((c) => !c.food_id).map((c) => c.name);
+    if (unknown.length > 0) {
+      toast.error(`인식되지 않은 음식: ${unknown.join(", ")}`);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/meals", {
@@ -61,12 +81,12 @@ export default function Home() {
         }
         return;
       }
-      window.dispatchEvent(new StorageEvent("storage", { key: "calclick.meals.v1" }));
       setCandidates(null);
       setFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       toast.success(`+${data.total_kcal} kcal 저장됨`);
+      fetchToday();
     } finally {
       setSaving(false);
     }
@@ -119,7 +139,7 @@ export default function Home() {
 
       <section className="flex flex-col items-center py-4">
         <span className="text-xs text-neutral-500">오늘 섭취</span>
-        <span className="text-5xl font-semibold tabular-nums text-[var(--accent)]">
+        <span className="text-5xl font-semibold tabular-nums text-green-600">
           {todayKcal}
         </span>
         <span className="text-xs text-neutral-500">kcal</span>
@@ -179,43 +199,47 @@ export default function Home() {
           <Button size="lg" onClick={onSave} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "오늘 식사에 저장"}
           </Button>
-          {candidates.map((c, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <CardTitle className="flex justify-between items-baseline">
-                  <span>{c.name}</span>
-                  <span className="text-2xl tabular-nums text-[var(--accent)]">
-                    {kcalFor(c.name, c.editedGrams)} kcal
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <div className="flex justify-between text-sm text-neutral-500">
-                  <span>중량</span>
-                  <span className="tabular-nums">{c.editedGrams} g</span>
-                </div>
-                <Slider
-                  min={50}
-                  max={800}
-                  step={50}
-                  value={[c.editedGrams]}
-                  onValueChange={(v) => {
-                    const next = Array.isArray(v) ? v[0] : v;
-                    setCandidates((prev) =>
-                      prev
-                        ? prev.map((p, pi) =>
-                            pi === i ? { ...p, editedGrams: next } : p,
-                          )
-                        : prev,
-                    );
-                  }}
-                />
-                <div className="text-xs text-neutral-400">
-                  신뢰도 {(c.confidence * 100).toFixed(0)}%
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {candidates.map((c, i) => {
+            const kcal = previewKcal(c);
+            return (
+              <Card key={i} className={c.food_id ? "" : "border-amber-400"}>
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-baseline">
+                    <span>{c.name}</span>
+                    <span className="text-2xl tabular-nums text-green-600">
+                      {kcal == null ? "?" : `${kcal} kcal`}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex justify-between text-sm text-neutral-500">
+                    <span>중량</span>
+                    <span className="tabular-nums">{c.editedGrams} g</span>
+                  </div>
+                  <Slider
+                    min={50}
+                    max={800}
+                    step={50}
+                    value={[c.editedGrams]}
+                    onValueChange={(v) => {
+                      const next = Array.isArray(v) ? v[0] : v;
+                      setCandidates((prev) =>
+                        prev
+                          ? prev.map((p, pi) =>
+                              pi === i ? { ...p, editedGrams: next } : p,
+                            )
+                          : prev,
+                      );
+                    }}
+                  />
+                  <div className="text-xs text-neutral-400">
+                    신뢰도 {(c.confidence * 100).toFixed(0)}%
+                    {!c.food_id && " · DB에 없는 음식"}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </section>
       )}
 
