@@ -91,13 +91,13 @@ export default function SignupPage() {
         <Button type="submit" disabled={loading}>
           {loading ? "가입 중…" : "가입"}
         </Button>
-        <p className="text-center text-sm text-neutral-500">
-          이미 계정이 있으신가요?{" "}
-          <Link href="/login" className="text-[var(--accent)] underline">
-            로그인
-          </Link>
-        </p>
       </form>
+      <p className="mt-4 text-center text-sm text-neutral-500">
+        이미 계정이 있으신가요?{" "}
+        <Link href="/login" className="text-green-600 underline font-medium">
+          로그인
+        </Link>
+      </p>
       <Toaster position="top-center" />
     </main>
   );

@@ -52,13 +52,13 @@ export default function LoginPage() {
         <Button type="submit" disabled={loading}>
           {loading ? "로그인 중…" : "로그인"}
         </Button>
-        <p className="text-center text-sm text-neutral-500">
-          계정이 없으신가요?{" "}
-          <Link href="/signup" className="text-[var(--accent)] underline">
-            가입
-          </Link>
-        </p>
       </form>
+      <p className="mt-4 text-center text-sm text-neutral-500">
+        계정이 없으신가요?{" "}
+        <Link href="/signup" className="text-green-600 underline font-medium">
+          가입
+        </Link>
+      </p>
       <Toaster position="top-center" />
     </main>
   );
