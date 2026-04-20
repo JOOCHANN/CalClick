@@ -7,11 +7,11 @@
     "build_passes": "npm run build 성공",
     "lint_passes": "npm run lint 무오류",
     "ios_camera": "iOS Safari에서 카메라 캡처 작동",
-    "vercel_deployed": "배포 URL 도달 가능"
+    "https_tunnel": "Cloudflare Tunnel HTTPS URL 도달 가능"
   },
   "steps": [
-    { "step": 1, "name": "scaffold",     "status": "pending", "summary": "" },
-    { "step": 2, "name": "pwa-shell",    "status": "pending", "summary": "" },
+    { "step": 1, "name": "scaffold",     "status": "completed", "summary": "Next.js 16 + Tailwind v4 + shadcn(Radix/Nova) + Pretendard + lucide-react. lint/build green." },
+    { "step": 2, "name": "pwa-shell",    "status": "completed", "summary": "manifest.webmanifest, PNG icons(192/512/maskable/apple-touch-180), layout metadata." },
     { "step": 3, "name": "api-recognize","status": "pending", "summary": "" },
     { "step": 4, "name": "capture-ui",   "status": "pending", "summary": "" },
     { "step": 5, "name": "local-storage","status": "pending", "summary": "" },
