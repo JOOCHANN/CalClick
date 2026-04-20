@@ -37,6 +37,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [candidates, setCandidates] = useState<EditableCandidate[] | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
   const [todayKcal, setTodayKcal] = useState<number>(0);
   const [saving, setSaving] = useState(false);
 
@@ -55,9 +56,10 @@ export default function Home() {
 
   const onSave = async () => {
     if (!candidates) return;
-    const unknown = candidates.filter((c) => !c.food_id).map((c) => c.name);
-    if (unknown.length > 0) {
-      toast.error(`인식되지 않은 음식: ${unknown.join(", ")}`);
+    const picked = candidates[selectedIdx];
+    if (!picked) return;
+    if (!picked.food_id) {
+      toast.error(`인식되지 않은 음식: ${picked.name}`);
       return;
     }
     setSaving(true);
@@ -66,7 +68,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          candidates: candidates.map((c) => ({ name: c.name, grams: c.editedGrams })),
+          candidates: [{ name: picked.name, grams: picked.editedGrams }],
         }),
       });
       const data = await res.json();
@@ -114,6 +116,7 @@ export default function Home() {
       setCandidates(
         data.candidates.map((c) => ({ ...c, editedGrams: snap(c.grams) })),
       );
+      setSelectedIdx(0);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "인식에 실패했어요");
     } finally {
@@ -201,42 +204,62 @@ export default function Home() {
           </Button>
           {candidates.map((c, i) => {
             const kcal = previewKcal(c);
+            const selected = i === selectedIdx;
             return (
-              <Card key={i} className={c.food_id ? "" : "border-amber-400"}>
+              <Card
+                key={i}
+                onClick={() => setSelectedIdx(i)}
+                className={`cursor-pointer transition ${
+                  selected
+                    ? "border-green-600 border-2"
+                    : c.food_id
+                      ? "opacity-60"
+                      : "opacity-60 border-amber-400"
+                }`}
+              >
                 <CardHeader>
-                  <CardTitle className="flex justify-between items-baseline">
-                    <span>{c.name}</span>
+                  <CardTitle className="flex justify-between items-baseline gap-2">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`inline-block w-4 h-4 rounded-full border-2 ${
+                          selected ? "border-green-600 bg-green-600" : "border-neutral-300"
+                        }`}
+                      />
+                      {c.name}
+                    </span>
                     <span className="text-2xl tabular-nums text-green-600">
                       {kcal == null ? "?" : `${kcal} kcal`}
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <div className="flex justify-between text-sm text-neutral-500">
-                    <span>중량</span>
-                    <span className="tabular-nums">{c.editedGrams} g</span>
-                  </div>
-                  <Slider
-                    min={50}
-                    max={800}
-                    step={50}
-                    value={[c.editedGrams]}
-                    onValueChange={(v) => {
-                      const next = Array.isArray(v) ? v[0] : v;
-                      setCandidates((prev) =>
-                        prev
-                          ? prev.map((p, pi) =>
-                              pi === i ? { ...p, editedGrams: next } : p,
-                            )
-                          : prev,
-                      );
-                    }}
-                  />
-                  <div className="text-xs text-neutral-400">
-                    신뢰도 {(c.confidence * 100).toFixed(0)}%
-                    {!c.food_id && " · DB에 없는 음식"}
-                  </div>
-                </CardContent>
+                {selected && (
+                  <CardContent className="flex flex-col gap-3">
+                    <div className="flex justify-between text-sm text-neutral-500">
+                      <span>중량</span>
+                      <span className="tabular-nums">{c.editedGrams} g</span>
+                    </div>
+                    <Slider
+                      min={50}
+                      max={800}
+                      step={50}
+                      value={[c.editedGrams]}
+                      onValueChange={(v) => {
+                        const next = Array.isArray(v) ? v[0] : v;
+                        setCandidates((prev) =>
+                          prev
+                            ? prev.map((p, pi) =>
+                                pi === i ? { ...p, editedGrams: next } : p,
+                              )
+                            : prev,
+                        );
+                      }}
+                    />
+                    <div className="text-xs text-neutral-400">
+                      신뢰도 {(c.confidence * 100).toFixed(0)}%
+                      {!c.food_id && " · DB에 없는 음식"}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             );
           })}
