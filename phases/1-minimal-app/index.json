@@ -15,6 +15,6 @@
     { "step": 3, "name": "api-recognize","status": "completed", "summary": "POST /api/recognize (GPT-4o Vision, zod, 3 vitest mock tests)." },
     { "step": 4, "name": "capture-ui",   "status": "completed", "summary": "카메라/파일 → resize 1024 → /api/recognize → 결과 카드 + 중량 슬라이더 + kcal (temp)." },
     { "step": 5, "name": "local-storage","status": "completed", "summary": "storage.ts + 오늘 kcal useSyncExternalStore, 저장 버튼, 3 vitest 통과." },
-    { "step": 6, "name": "deploy",       "status": "pending", "summary": "" }
+    { "step": 6, "name": "deploy",       "status": "pending", "summary": "DEPLOY.md 작성. 사용자가 cloudflared 실행 + iPhone 체크리스트 수행 필요." }
   ]
 }
