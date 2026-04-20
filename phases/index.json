@@ -2,7 +2,7 @@
   "project": "CalClick",
   "phases": [
     { "dir": "0-core-poc", "name": "core-poc", "status": "skipped", "skipped_reason": "사용자가 eval 기반 자동 검증을 생략하고 실제 앱 구현 후 직접 테스트하기로 결정. ADR-002 실측 검증은 Phase 1 이후 실사용으로 대체.", "skipped_at": "2026-04-20" },
-    { "dir": "1-minimal-app", "name": "minimal-app", "status": "pending", "gate": "iOS Safari camera works, Vercel deployed" },
+    { "dir": "1-minimal-app", "name": "minimal-app", "status": "completed", "gate": "Cloudflare Workers + AI Gateway 경유로 분석 성공, 배포 URL 도달 가능" },
     { "dir": "2-auth-persistence", "name": "auth-persistence", "status": "pending", "gate": "RLS isolates users, today kcal persists" },
     { "dir": "3-multi-food", "name": "multi-food", "status": "pending", "gate": "share-split UX works, 한상차림 인식 동작 확인" },
     { "dir": "4-diary", "name": "diary", "status": "pending" },
