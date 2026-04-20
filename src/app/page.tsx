@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
 import { kcalFor } from "@/lib/kcal-temp";
+import { addMeal, todayTotalKcal } from "@/lib/storage";
 import type { RecognitionResult } from "@/types/recognition";
 
 type Candidate = RecognitionResult["candidates"][number];
@@ -18,12 +19,39 @@ function snap(g: number): number {
   return Math.max(50, Math.round(g / 50) * 50);
 }
 
+function subscribeStorage(cb: () => void): () => void {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+}
+
 export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [candidates, setCandidates] = useState<EditableCandidate[] | null>(null);
+  const todayKcal = useSyncExternalStore(
+    subscribeStorage,
+    () => todayTotalKcal(),
+    () => 0,
+  );
+
+  const onSave = () => {
+    if (!candidates) return;
+    const foods = candidates.map((c) => ({
+      name: c.name,
+      grams: c.editedGrams,
+      kcal: kcalFor(c.name, c.editedGrams),
+    }));
+    const totalKcal = foods.reduce((s, f) => s + f.kcal, 0);
+    addMeal({ foods, totalKcal });
+    window.dispatchEvent(new StorageEvent("storage", { key: "calclick.meals.v1" }));
+    setCandidates(null);
+    setFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    toast.success(`+${totalKcal} kcal 저장됨`);
+  };
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -60,6 +88,14 @@ export default function Home() {
         <h1 className="text-2xl font-semibold">CalClick</h1>
         <span className="text-xs text-neutral-500">한상 1장 · kcal</span>
       </header>
+
+      <section className="flex flex-col items-center py-4">
+        <span className="text-xs text-neutral-500">오늘 섭취</span>
+        <span className="text-5xl font-semibold tabular-nums text-[var(--accent)]">
+          {todayKcal}
+        </span>
+        <span className="text-xs text-neutral-500">kcal</span>
+      </section>
 
       <input
         ref={fileRef}
@@ -112,6 +148,9 @@ export default function Home() {
 
       {candidates && (
         <section className="flex flex-col gap-3">
+          <Button size="lg" onClick={onSave}>
+            오늘 식사에 저장
+          </Button>
           {candidates.map((c, i) => (
             <Card key={i}>
               <CardHeader>
