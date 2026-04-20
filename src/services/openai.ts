@@ -8,6 +8,7 @@ export function getOpenAI(): OpenAI {
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY missing");
   }
-  client = new OpenAI({ apiKey });
+  const baseURL = process.env.OPENAI_BASE_URL;
+  client = new OpenAI({ apiKey, baseURL: baseURL || undefined });
   return client;
 }
