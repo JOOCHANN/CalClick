@@ -51,3 +51,11 @@ next-env.d.ts
 harness_ref/
 harness_framework-main.zip
 phases/0-core-poc/eval/results/
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
