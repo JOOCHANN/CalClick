@@ -1,14 +1,53 @@
+# dependencies
+/node_modules
 node_modules/
-.next/
-.env
-.env.local
-.DS_Store
-*.log
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
 coverage/
 playwright-report/
 test-results/
+
+# next.js
+/.next/
+.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env.*
+.env.local
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# project-specific
 harness_ref/
 harness_framework-main.zip
-
-# Phase 0 PoC outputs: results/는 재현 가능하므로 제외. images는 git-lfs 고려.
 phases/0-core-poc/eval/results/
