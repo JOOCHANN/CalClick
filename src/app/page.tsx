@@ -162,12 +162,6 @@ export default function Home() {
       toast.error("저장할 음식을 하나 이상 선택해 주세요");
       return;
     }
-    const savable = selected.filter((c) => c.food_id);
-    const skipped = selected.filter((c) => !c.food_id).map((c) => c.name);
-    if (savable.length === 0) {
-      toast.error("저장 가능한 음식이 없어요 (DB 미등록 음식은 미리보기에만 계산됩니다)");
-      return;
-    }
     setSaving(true);
     try {
       let photoPath: string | undefined;
@@ -187,7 +181,12 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          candidates: savable.map((c) => ({ name: c.name, grams: c.editedGrams })),
+          candidates: selected.map((c) => ({
+            name: c.name,
+            grams: c.editedGrams,
+            kcalPer100g: c.kcal_per_100g ?? 0,
+            source: c.source ?? (c.food_id ? "db" : "llm"),
+          })),
           shareCount,
           mealType,
           photoPath,
@@ -216,9 +215,7 @@ export default function Home() {
       setPreviewUrl(null);
       const prefix = `${MEAL_LABELS[mealType]} +${data.total_kcal} kcal 저장됨`;
       const base = shareCount > 1 ? `${prefix} (${shareCount}명 공유)` : prefix;
-      toast.success(
-        skipped.length > 0 ? `${base} (DB 미등록 제외: ${skipped.join(", ")})` : base,
-      );
+      toast.success(base);
       fetchToday();
     } finally {
       setSaving(false);

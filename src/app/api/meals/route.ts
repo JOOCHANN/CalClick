@@ -10,6 +10,8 @@ const BodySchema = z.object({
       z.object({
         name: z.string().min(1),
         grams: z.number().positive().max(5000),
+        kcalPer100g: z.number().nonnegative().optional(),
+        source: z.enum(["db", "llm"]).default("db"),
       }),
     )
     .min(1),
@@ -36,19 +38,28 @@ export async function POST(request: Request) {
   }
   const { candidates, eatenAt, mealType, shareCount, note, photoPath } = parsed.data;
 
-  const foodMap = await findFoodsByAliases(candidates.map((c) => c.name));
-  const unknown = candidates.filter((c) => !foodMap.get(c.name.trim())).map((c) => c.name);
-  if (unknown.length > 0) {
-    return NextResponse.json({ error: "unknown_foods", unknown }, { status: 400 });
-  }
+  const dbNames = candidates.filter((c) => c.source === "db").map((c) => c.name);
+  const foodMap = dbNames.length > 0 ? await findFoodsByAliases(dbNames) : new Map();
 
   const items = candidates.map((c) => {
-    const f = foodMap.get(c.name.trim())!;
     const myGrams = c.grams / shareCount;
+    const f = c.source === "db" ? foodMap.get(c.name.trim()) : null;
+    if (f) {
+      return {
+        food_id: f.food_id as string,
+        name: null as string | null,
+        source: "db" as const,
+        grams: Math.round(myGrams),
+        kcal: computeKcal(f.kcal_per_100g, myGrams),
+      };
+    }
+    const kcalPer100g = c.kcalPer100g ?? 0;
     return {
-      food_id: f.food_id,
+      food_id: null,
+      name: c.name,
+      source: "llm" as const,
       grams: Math.round(myGrams),
-      kcal: computeKcal(f.kcal_per_100g, myGrams),
+      kcal: Math.round((kcalPer100g * myGrams) / 100),
     };
   });
   const totalKcal = items.reduce((s, it) => s + it.kcal, 0);
