@@ -85,11 +85,10 @@ export default function Home() {
       toast.error("저장할 음식을 하나 이상 선택해 주세요");
       return;
     }
-    const missing = selected.filter(
-      (c) => !c.food_id && !(c.customKcalPer100g != null && c.customKcalPer100g > 0),
-    );
-    if (missing.length > 0) {
-      toast.error(`칼로리(100g 기준)를 입력해 주세요: ${missing.map((c) => c.name).join(", ")}`);
+    const savable = selected.filter((c) => c.food_id);
+    const skipped = selected.filter((c) => !c.food_id).map((c) => c.name);
+    if (savable.length === 0) {
+      toast.error("저장 가능한 음식이 없어요 (DB 미등록 음식은 미리보기에만 계산됩니다)");
       return;
     }
     setSaving(true);
@@ -98,11 +97,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          candidates: selected.map((c) => ({
-            name: c.name,
-            grams: c.editedGrams,
-            ...(c.food_id ? {} : { customKcalPer100g: c.customKcalPer100g }),
-          })),
+          candidates: savable.map((c) => ({ name: c.name, grams: c.editedGrams })),
           shareCount,
         }),
       });
@@ -125,10 +120,12 @@ export default function Home() {
       setFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
-      toast.success(
+      const base =
         shareCount > 1
           ? `${shareCount}명 공유: +${data.total_kcal} kcal 저장됨`
-          : `+${data.total_kcal} kcal 저장됨`,
+          : `+${data.total_kcal} kcal 저장됨`;
+      toast.success(
+        skipped.length > 0 ? `${base} (DB 미등록 제외: ${skipped.join(", ")})` : base,
       );
       fetchToday();
     } finally {
@@ -380,7 +377,7 @@ export default function Home() {
                           {!c.food_id && (
                             <div className="flex flex-col gap-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
                               <label className="text-xs text-amber-800">
-                                DB에 없는 음식 · 100g 기준 칼로리를 입력해 주세요
+                                DB에 없는 음식 · 100g 기준 kcal 입력 (미리보기 전용, 저장되지 않음)
                               </label>
                               <div className="flex items-center gap-2">
                                 <input
