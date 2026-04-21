@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Utensils, Flame, Calendar as CalendarIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Utensils,
+  Flame,
+  Calendar as CalendarIcon,
+  ImageIcon,
+  Info,
+  Loader2,
+} from "lucide-react";
 
 type Day = { date: string; total_kcal: number };
 type Stats = {
@@ -13,13 +22,27 @@ type Stats = {
   active_days: number;
 };
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+type DayItem = {
+  id: string;
+  name: string;
+  grams: number;
+  kcal: number;
+  source: "db" | "llm";
+  food_id: string | null;
+  kcal_per_100g: number | null;
+  carb_g: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  food_source: string | null;
+};
 type DayMeal = {
   id: string;
   eaten_at: string;
   meal_type: MealType | null;
   total_kcal: number;
   share_count: number;
-  items: { id: string; name: string; grams: number; kcal: number }[];
+  has_photo: boolean;
+  items: DayItem[];
 };
 type DayDetail = { total_kcal: number; meals: DayMeal[] };
 
@@ -70,6 +93,21 @@ export default function MePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [loadingPhoto, setLoadingPhoto] = useState<Record<string, boolean>>({});
+  const [openDetail, setOpenDetail] = useState<Record<string, boolean>>({});
+
+  const loadPhoto = useCallback(async (mealId: string) => {
+    setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
+    try {
+      const res = await fetch(`/api/meals/${mealId}/photo`);
+      if (!res.ok) return;
+      const { url } = (await res.json()) as { url: string };
+      setPhotoUrls((prev) => ({ ...prev, [mealId]: url }));
+    } finally {
+      setLoadingPhoto((prev) => ({ ...prev, [mealId]: false }));
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     const res = await fetch(`/api/stats/daily?month=${formatMonthKey(cursor)}`);
@@ -265,23 +303,124 @@ export default function MePage() {
                         </span>
                       </div>
                       <ul className="flex flex-col gap-1">
-                        {m.items.map((it) => (
-                          <li
-                            key={it.id}
-                            className="flex justify-between items-center text-sm text-neutral-600"
-                          >
-                            <span className="truncate">
-                              {it.name}{" "}
-                              <span className="text-neutral-400 text-xs tabular-nums">
-                                {it.grams}g
-                              </span>
-                            </span>
-                            <span className="text-neutral-500 tabular-nums shrink-0">
-                              {it.kcal} kcal
-                            </span>
-                          </li>
-                        ))}
+                        {m.items.map((it) => {
+                          const detailKey = it.id;
+                          const isOpen = !!openDetail[detailKey];
+                          const hasMacro =
+                            it.carb_g != null || it.protein_g != null || it.fat_g != null;
+                          return (
+                            <li key={it.id} className="flex flex-col gap-1">
+                              <div className="flex justify-between items-center text-sm text-neutral-600 gap-2">
+                                <span className="truncate flex items-center gap-1.5 min-w-0">
+                                  <span className="truncate">
+                                    {it.name}{" "}
+                                    <span className="text-neutral-400 text-xs tabular-nums">
+                                      {it.grams}g
+                                    </span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setOpenDetail((prev) => ({
+                                        ...prev,
+                                        [detailKey]: !prev[detailKey],
+                                      }))
+                                    }
+                                    className={`shrink-0 p-0.5 rounded hover:bg-neutral-100 ${
+                                      isOpen ? "text-green-600" : "text-neutral-400"
+                                    }`}
+                                    aria-label="상세정보"
+                                    title="상세정보"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </span>
+                                <span className="text-neutral-500 tabular-nums shrink-0">
+                                  {it.kcal} kcal
+                                </span>
+                              </div>
+                              {isOpen && (
+                                <div className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600 flex flex-col gap-1">
+                                  <div className="flex justify-between">
+                                    <span className="text-neutral-400">출처</span>
+                                    <span className="tabular-nums">
+                                      {it.source === "db"
+                                        ? `공식 DB${it.food_source ? ` · ${it.food_source.toUpperCase()}` : ""}`
+                                        : "AI 추정"}
+                                    </span>
+                                  </div>
+                                  {it.kcal_per_100g != null && (
+                                    <div className="flex justify-between">
+                                      <span className="text-neutral-400">100g당</span>
+                                      <span className="tabular-nums">
+                                        {Math.round(it.kcal_per_100g)} kcal
+                                      </span>
+                                    </div>
+                                  )}
+                                  {hasMacro ? (
+                                    <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                                      <div>
+                                        <div className="text-[10px] text-neutral-400">탄수</div>
+                                        <div className="tabular-nums">
+                                          {it.carb_g != null
+                                            ? `${Math.round(((it.carb_g ?? 0) * it.grams) / 100)}g`
+                                            : "—"}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] text-neutral-400">단백</div>
+                                        <div className="tabular-nums">
+                                          {it.protein_g != null
+                                            ? `${Math.round(((it.protein_g ?? 0) * it.grams) / 100)}g`
+                                            : "—"}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-[10px] text-neutral-400">지방</div>
+                                        <div className="tabular-nums">
+                                          {it.fat_g != null
+                                            ? `${Math.round(((it.fat_g ?? 0) * it.grams) / 100)}g`
+                                            : "—"}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-neutral-400 text-center pt-1">
+                                      상세 영양정보 없음
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
+                      {m.has_photo && (
+                        <div className="pt-1">
+                          {photoUrls[m.id] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={photoUrls[m.id]}
+                              alt="식사 사진"
+                              className="w-full rounded-lg object-cover max-h-60"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => loadPhoto(m.id)}
+                              disabled={loadingPhoto[m.id]}
+                              className="w-full flex items-center justify-center gap-1.5 text-xs text-neutral-500 bg-neutral-50 hover:bg-neutral-100 rounded-lg py-2 disabled:opacity-60"
+                            >
+                              {loadingPhoto[m.id] ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <ImageIcon className="w-3.5 h-3.5" />
+                              )}
+                              {loadingPhoto[m.id] ? "불러오는 중…" : "사진 보기"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
