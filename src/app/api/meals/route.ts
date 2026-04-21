@@ -43,11 +43,11 @@ export async function POST(request: Request) {
 
   const items = candidates.map((c) => {
     const f = foodMap.get(c.name.trim())!;
-    const rawKcal = computeKcal(f.kcal_per_100g, c.grams);
+    const myGrams = c.grams / shareCount;
     return {
       food_id: f.food_id,
-      grams: c.grams,
-      kcal: Math.round(rawKcal / shareCount),
+      grams: Math.round(myGrams),
+      kcal: computeKcal(f.kcal_per_100g, myGrams),
     };
   });
   const totalKcal = items.reduce((s, it) => s + it.kcal, 0);
