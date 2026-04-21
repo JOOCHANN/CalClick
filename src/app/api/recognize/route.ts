@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getOpenAI } from "@/services/openai";
 import { RecognitionResult } from "@/types/recognition";
 import { findFoodsByAliases } from "@/services/foods";
+import { supabaseServer } from "@/services/supabase-server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +14,15 @@ const USER_PROMPT =
   '{"candidates":[{"name":"한국어 음식명","grams":추정 중량,"confidence":0-1}]} 형식으로만 반환. 기준물(숟가락 15cm, 밥공기 직경 10cm)이 보이면 중량 반영. 후보는 1~5개.';
 
 export async function POST(req: Request) {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!checkRateLimit(`recognize:${user.id}`, 10, 60_000)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
+
   const form = await req.formData().catch(() => null);
   const image = form?.get("image");
   if (!image || !(image instanceof Blob)) {

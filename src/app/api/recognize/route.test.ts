@@ -13,6 +13,12 @@ vi.mock("@/services/foods", () => ({
   findFoodsByAliases: vi.fn(async () => new Map()),
 }));
 
+vi.mock("@/services/supabase-server", () => ({
+  supabaseServer: async () => ({
+    auth: { getUser: async () => ({ data: { user: { id: "test-user" } } }) },
+  }),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(image?: Blob): Request {

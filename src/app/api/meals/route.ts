@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/services/supabase-server";
 import { findFoodByAlias, computeKcal } from "@/services/foods";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const BodySchema = z.object({
   candidates: z
@@ -24,6 +25,9 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!checkRateLimit(`meals:${user.id}`, 60, 60_000)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
 
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

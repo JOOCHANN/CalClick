@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 import { resizeImage } from "@/lib/image-resize";
 import { supabaseBrowser } from "@/services/supabase";
 import type { RecognitionResult } from "@/types/recognition";
@@ -111,6 +112,14 @@ export default function Home() {
       const form = new FormData();
       form.append("image", blob, "meal.jpg");
       const res = await fetch("/api/recognize", { method: "POST", body: form });
+      if (res.status === 401) {
+        location.href = "/login";
+        return;
+      }
+      if (res.status === 429) {
+        toast.error("요청이 너무 많아요. 잠시 후 다시 시도해주세요");
+        return;
+      }
       if (!res.ok) throw new Error(`analyze failed: ${res.status}`);
       const data: RecognitionResult = await res.json();
       setCandidates(
@@ -129,7 +138,7 @@ export default function Home() {
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">CalClick</h1>
         <div className="flex gap-3 text-xs text-neutral-500">
-          <a href="/settings" className="underline">설정</a>
+          <Link href="/settings" className="underline">설정</Link>
           <button
             type="button"
             onClick={async () => {
