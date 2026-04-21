@@ -12,7 +12,7 @@ import { resizeImage } from "@/lib/image-resize";
 import { supabaseBrowser } from "@/services/supabase";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
-type EditableCandidate = FoodCandidate & { editedGrams: number };
+type EditableCandidate = FoodCandidate & { editedGrams: number; customKcalPer100g?: number };
 type EditableItem = {
   label: string | null;
   candidates: EditableCandidate[];
@@ -24,9 +24,16 @@ function snap(g: number): number {
   return Math.max(50, Math.round(g / 50) * 50);
 }
 
+function effectiveKcalPer100g(c: EditableCandidate): number | null {
+  if (c.kcal_per_100g != null) return c.kcal_per_100g;
+  if (c.customKcalPer100g != null && c.customKcalPer100g > 0) return c.customKcalPer100g;
+  return null;
+}
+
 function candKcal(c: EditableCandidate): number | null {
-  if (c.kcal_per_100g == null) return null;
-  return Math.round((c.kcal_per_100g * c.editedGrams) / 100);
+  const k = effectiveKcalPer100g(c);
+  if (k == null) return null;
+  return Math.round((k * c.editedGrams) / 100);
 }
 
 function todayRange(): { from: string; to: string } {
@@ -78,9 +85,11 @@ export default function Home() {
       toast.error("저장할 음식을 하나 이상 선택해 주세요");
       return;
     }
-    const unknown = selected.filter((c) => !c.food_id).map((c) => c.name);
-    if (unknown.length > 0) {
-      toast.error(`인식되지 않은 음식: ${unknown.join(", ")}`);
+    const missing = selected.filter(
+      (c) => !c.food_id && !(c.customKcalPer100g != null && c.customKcalPer100g > 0),
+    );
+    if (missing.length > 0) {
+      toast.error(`칼로리(100g 기준)를 입력해 주세요: ${missing.map((c) => c.name).join(", ")}`);
       return;
     }
     setSaving(true);
@@ -89,7 +98,11 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          candidates: selected.map((c) => ({ name: c.name, grams: c.editedGrams })),
+          candidates: selected.map((c) => ({
+            name: c.name,
+            grams: c.editedGrams,
+            ...(c.food_id ? {} : { customKcalPer100g: c.customKcalPer100g }),
+          })),
           shareCount,
         }),
       });
@@ -364,9 +377,34 @@ export default function Home() {
                               updateCandidate(itIdx, cIdx, { editedGrams: next });
                             }}
                           />
+                          {!c.food_id && (
+                            <div className="flex flex-col gap-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                              <label className="text-xs text-amber-800">
+                                DB에 없는 음식 · 100g 기준 칼로리를 입력해 주세요
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={2000}
+                                  step={10}
+                                  value={c.customKcalPer100g ?? ""}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    updateCandidate(itIdx, cIdx, {
+                                      customKcalPer100g: v === "" ? undefined : Number(v),
+                                    });
+                                  }}
+                                  placeholder="예: 150"
+                                  className="w-24 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm tabular-nums outline-none focus:border-amber-500"
+                                />
+                                <span className="text-xs text-neutral-500">kcal / 100g</span>
+                              </div>
+                            </div>
+                          )}
                           <div className="text-xs text-neutral-400">
                             신뢰도 {(c.confidence * 100).toFixed(0)}%
-                            {!c.food_id && " · DB에 없는 음식"}
                           </div>
                         </CardContent>
                       )}

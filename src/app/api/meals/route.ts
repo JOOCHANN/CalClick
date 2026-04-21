@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/services/supabase-server";
+import { supabaseAdmin } from "@/services/supabase-admin";
 import { findFoodsByAliases, computeKcal } from "@/services/foods";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -10,6 +11,7 @@ const BodySchema = z.object({
       z.object({
         name: z.string().min(1),
         grams: z.number().positive().max(5000),
+        customKcalPer100g: z.number().nonnegative().max(2000).optional(),
       }),
     )
     .min(1),
@@ -36,20 +38,42 @@ export async function POST(request: Request) {
   const { candidates, eatenAt, mealType, shareCount, note } = parsed.data;
 
   const foodMap = await findFoodsByAliases(candidates.map((c) => c.name));
-  const unknown = candidates.filter((c) => !foodMap.get(c.name.trim())).map((c) => c.name);
-  if (unknown.length > 0) {
-    return NextResponse.json({ error: "unknown_foods", unknown }, { status: 400 });
+  const unknownNoCustom = candidates
+    .filter((c) => !foodMap.get(c.name.trim()) && c.customKcalPer100g == null)
+    .map((c) => c.name);
+  if (unknownNoCustom.length > 0) {
+    return NextResponse.json({ error: "unknown_foods", unknown: unknownNoCustom }, { status: 400 });
   }
 
-  const items = candidates.map((c) => {
-    const food = foodMap.get(c.name.trim())!;
-    const rawKcal = computeKcal(food.kcal_per_100g, c.grams);
-    return {
-      food_id: food.food_id,
+  const admin = supabaseAdmin();
+  const items: Array<{ food_id: string; grams: number; kcal: number }> = [];
+  for (const c of candidates) {
+    const existing = foodMap.get(c.name.trim());
+    let foodId: string;
+    let kcalPer100g: number;
+    if (existing) {
+      foodId = existing.food_id;
+      kcalPer100g = existing.kcal_per_100g;
+    } else {
+      foodId = `user_${user.id.slice(0, 8)}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      kcalPer100g = c.customKcalPer100g!;
+      const { error: foodErr } = await admin.from("foods").insert({
+        food_id: foodId,
+        official_name: c.name,
+        kcal_per_100g: kcalPer100g,
+        source: "manual",
+      });
+      if (foodErr) {
+        return NextResponse.json({ error: "food_insert_failed", detail: foodErr.message }, { status: 500 });
+      }
+    }
+    const rawKcal = computeKcal(kcalPer100g, c.grams);
+    items.push({
+      food_id: foodId,
       grams: c.grams,
       kcal: Math.round(rawKcal / shareCount),
-    };
-  });
+    });
+  }
   const totalKcal = items.reduce((s, it) => s + it.kcal, 0);
 
   const { data: meal, error: mealErr } = await supabase
