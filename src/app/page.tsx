@@ -78,6 +78,7 @@ export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const resizedRef = useRef<Blob | null>(null);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<EditableItem[] | null>(null);
   const [shareCount, setShareCount] = useState<number>(1);
@@ -176,6 +177,19 @@ export default function Home() {
     }
     setSaving(true);
     try {
+      let photoPath: string | undefined;
+      if (resizedRef.current) {
+        const fd = new FormData();
+        fd.append("image", resizedRef.current, "meal.jpg");
+        const up = await fetch("/api/upload", { method: "POST", body: fd });
+        if (up.ok) {
+          const d = await up.json();
+          photoPath = d.path;
+        } else {
+          const d = await up.json().catch(() => ({}));
+          toast.error(`사진 업로드 실패: ${d.error ?? up.status}`);
+        }
+      }
       const res = await fetch("/api/meals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,6 +197,7 @@ export default function Home() {
           candidates: savable.map((c) => ({ name: c.name, grams: c.editedGrams })),
           shareCount,
           mealType,
+          photoPath,
         }),
       });
       const data = await res.json();
@@ -203,6 +218,7 @@ export default function Home() {
       setShareCount(1);
       setMealType(guessMealType());
       setFile(null);
+      resizedRef.current = null;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       const prefix = `${MEAL_LABELS[mealType]} +${data.total_kcal} kcal 저장됨`;
@@ -230,6 +246,7 @@ export default function Home() {
     setLoading(true);
     try {
       const blob = await resizeImage(file);
+      resizedRef.current = blob;
       const form = new FormData();
       form.append("image", blob, "meal.jpg");
       const res = await fetch("/api/recognize", { method: "POST", body: form });
@@ -542,9 +559,20 @@ export default function Home() {
               arr.push(idx);
               groups.set(key, arr);
             });
-            return [...groups.entries()].map(([label, idxs]) => (
-              <section key={label} className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium text-neutral-700 px-1">{label}</h3>
+            const palette = [
+              "bg-green-50 ring-green-100",
+              "bg-amber-50 ring-amber-100",
+              "bg-sky-50 ring-sky-100",
+              "bg-rose-50 ring-rose-100",
+              "bg-violet-50 ring-violet-100",
+              "bg-lime-50 ring-lime-100",
+            ];
+            return [...groups.entries()].map(([label, idxs], gi) => (
+              <section
+                key={label}
+                className={`flex flex-col gap-2 rounded-xl ring-1 px-3 py-3 ${palette[gi % palette.length]}`}
+              >
+                <h3 className="text-sm font-semibold text-neutral-800 px-1">{label}</h3>
                 {idxs.map((itIdx) => {
                   const it = items[itIdx];
                   const c = it.candidates[it.selectedIdx];

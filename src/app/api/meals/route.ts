@@ -17,6 +17,7 @@ const BodySchema = z.object({
   mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]).optional(),
   shareCount: z.number().int().positive().default(1),
   note: z.string().max(500).optional(),
+  photoPath: z.string().max(300).optional(),
 });
 
 export async function POST(request: Request) {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_body", detail: parsed.error.flatten() }, { status: 400 });
   }
-  const { candidates, eatenAt, mealType, shareCount, note } = parsed.data;
+  const { candidates, eatenAt, mealType, shareCount, note, photoPath } = parsed.data;
 
   const foodMap = await findFoodsByAliases(candidates.map((c) => c.name));
   const unknown = candidates.filter((c) => !foodMap.get(c.name.trim())).map((c) => c.name);
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       total_kcal: totalKcal,
       share_count: shareCount,
       note: note ?? null,
+      photo_path: photoPath ?? null,
     })
     .select("id")
     .single();
