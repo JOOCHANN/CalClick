@@ -8,9 +8,15 @@ export const FoodCandidate = z.object({
   kcal_per_100g: z.number().nullable().optional(),
 });
 
+export const RecognitionItem = z.object({
+  label: z.string().nullable().optional(),
+  candidates: z.array(FoodCandidate).min(1).max(3),
+});
+
 export const RecognitionResult = z.object({
-  candidates: z.array(FoodCandidate).min(1).max(5),
+  items: z.array(RecognitionItem).min(1).max(8),
 });
 
 export type FoodCandidate = z.infer<typeof FoodCandidate>;
+export type RecognitionItem = z.infer<typeof RecognitionItem>;
 export type RecognitionResult = z.infer<typeof RecognitionResult>;

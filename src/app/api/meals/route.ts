@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/services/supabase-server";
-import { findFoodByAlias, computeKcal } from "@/services/foods";
+import { findFoodsByAliases, computeKcal } from "@/services/foods";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const BodySchema = z.object({
@@ -35,19 +35,21 @@ export async function POST(request: Request) {
   }
   const { candidates, eatenAt, mealType, shareCount, note } = parsed.data;
 
-  const resolved = await Promise.all(
-    candidates.map(async (c) => ({ input: c, food: await findFoodByAlias(c.name) })),
-  );
-  const unknown = resolved.filter((r) => !r.food).map((r) => r.input.name);
+  const foodMap = await findFoodsByAliases(candidates.map((c) => c.name));
+  const unknown = candidates.filter((c) => !foodMap.get(c.name.trim())).map((c) => c.name);
   if (unknown.length > 0) {
     return NextResponse.json({ error: "unknown_foods", unknown }, { status: 400 });
   }
 
-  const items = resolved.map(({ input, food }) => ({
-    food_id: food!.food_id,
-    grams: input.grams,
-    kcal: computeKcal(food!.kcal_per_100g, input.grams),
-  }));
+  const items = candidates.map((c) => {
+    const food = foodMap.get(c.name.trim())!;
+    const rawKcal = computeKcal(food.kcal_per_100g, c.grams);
+    return {
+      food_id: food.food_id,
+      grams: c.grams,
+      kcal: Math.round(rawKcal / shareCount),
+    };
+  });
   const totalKcal = items.reduce((s, it) => s + it.kcal, 0);
 
   const { data: meal, error: mealErr } = await supabase

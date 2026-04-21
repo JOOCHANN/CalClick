@@ -1,7 +1,11 @@
 {
   "project": "CalClick",
   "phase": "multi-food",
-  "description": "한상차림 다중 음식 UX (차별점). 결과 카드별 중량 슬라이더, 공유 인원 ÷N 토글.",
-  "gate": { "phase0_regression": "within_5pp", "share_split": "ui_works" },
-  "steps": []
+  "description": "한상차림 다중 음식 UX (차별점). LLM이 여러 음식을 한 번에 감지, 음식별 후보 선택/중량 조정, 공유 인원 ÷N.",
+  "gate": { "multi_item_save": "items N개 → meal_items N row", "share_split": "share_count 반영되어 저장" },
+  "steps": [
+    { "id": 1, "name": "multi-food-prompt", "file": "step1.md" },
+    { "id": 2, "name": "multi-food-ui", "file": "step2.md" },
+    { "id": 3, "name": "share-count", "file": "step3.md" }
+  ]
 }

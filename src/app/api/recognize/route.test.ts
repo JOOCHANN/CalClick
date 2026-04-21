@@ -44,11 +44,20 @@ describe("POST /api/recognize", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 200 + parsed result on success", async () => {
+  it("returns 200 + items on success", async () => {
     createMock.mockResolvedValueOnce(
       validResponse(
         JSON.stringify({
-          candidates: [{ name: "김치찌개", grams: 350, confidence: 0.9 }],
+          items: [
+            {
+              label: "국",
+              candidates: [{ name: "김치찌개", grams: 350, confidence: 0.9 }],
+            },
+            {
+              label: "밥",
+              candidates: [{ name: "쌀밥", grams: 210, confidence: 0.95 }],
+            },
+          ],
         }),
       ),
     );
@@ -58,12 +67,13 @@ describe("POST /api/recognize", () => {
     const res = await POST(makeRequest(blob));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.candidates[0].name).toBe("김치찌개");
+    expect(body.items).toHaveLength(2);
+    expect(body.items[0].candidates[0].name).toBe("김치찌개");
   });
 
   it("returns 502 on schema violation", async () => {
     createMock.mockResolvedValueOnce(
-      validResponse(JSON.stringify({ candidates: [] })),
+      validResponse(JSON.stringify({ items: [] })),
     );
     const blob = new Blob([new Uint8Array([0xff])], { type: "image/jpeg" });
     const res = await POST(makeRequest(blob));

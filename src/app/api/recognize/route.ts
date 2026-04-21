@@ -8,10 +8,13 @@ import { checkRateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const SYSTEM_PROMPT =
-  "너는 한식 영양 분석 전문가다. 사진에서 음식을 찾아 상위 3개 후보를 JSON으로만 답하라.";
+  "너는 한식 영양 분석 전문가다. 한상차림 사진에서 **각 음식(국·밥·반찬·메인 등)**을 모두 찾아, 각 음식에 대해 상위 후보를 JSON으로만 답하라.";
 
-const USER_PROMPT =
-  '{"candidates":[{"name":"한국어 음식명","grams":추정 중량,"confidence":0-1}]} 형식으로만 반환. 기준물(숟가락 15cm, 밥공기 직경 10cm)이 보이면 중량 반영. 후보는 1~5개.';
+const USER_PROMPT = `{"items":[{"label":"국/밥/반찬/메인 중 하나 또는 null","candidates":[{"name":"한국어 음식명","grams":추정 중량 g,"confidence":0-1}]}]} 형식으로만 반환.
+- items는 사진에 실제로 보이는 서로 다른 음식마다 하나씩 (한상차림이면 1~6개, 단일 음식이면 1개).
+- 각 item의 candidates는 그 음식의 top 1~3 후보.
+- 기준물(숟가락 15cm, 밥공기 직경 10cm)이 보이면 중량 반영.
+- 같은 그릇의 음식을 여러 item으로 쪼개지 말 것. 다른 그릇/다른 반찬은 각자 별도 item.`;
 
 export async function POST(req: Request) {
   const supabase = await supabaseServer();
@@ -64,14 +67,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "schema validation failed" }, { status: 502 });
   }
 
-  const map = await findFoodsByAliases(result.data.candidates.map((c) => c.name));
-  const enriched = result.data.candidates.map((c) => {
-    const f = map.get(c.name.trim());
-    return {
-      ...c,
-      food_id: f?.food_id ?? null,
-      kcal_per_100g: f?.kcal_per_100g ?? null,
-    };
-  });
-  return NextResponse.json({ candidates: enriched });
+  const allNames = result.data.items.flatMap((it) => it.candidates.map((c) => c.name));
+  const map = await findFoodsByAliases(allNames);
+  const enrichedItems = result.data.items.map((it) => ({
+    label: it.label ?? null,
+    candidates: it.candidates.map((c) => {
+      const f = map.get(c.name.trim());
+      return {
+        ...c,
+        food_id: f?.food_id ?? null,
+        kcal_per_100g: f?.kcal_per_100g ?? null,
+      };
+    }),
+  }));
+  return NextResponse.json({ items: enrichedItems });
 }
