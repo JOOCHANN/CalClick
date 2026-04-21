@@ -26,7 +26,7 @@ type TodayMeal = {
   meal_type: MealType | null;
   total_kcal: number;
   share_count: number;
-  items: { name: string; grams: number; kcal: number }[];
+  items: { id: string; name: string; grams: number; kcal: number }[];
 };
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -86,6 +86,7 @@ export default function Home() {
   const [todayMeals, setTodayMeals] = useState<TodayMeal[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editKcal, setEditKcal] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const todayLabel = formatToday();
@@ -122,6 +123,22 @@ export default function Home() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ total_kcal: n }),
+    });
+    if (!res.ok) {
+      toast.error("수정 실패");
+      return;
+    }
+    fetchToday();
+  };
+
+  const saveItemEdit = async (itemId: string, prevKcal: number) => {
+    const n = Math.round(Number(editKcal));
+    setEditingItemId(null);
+    if (!Number.isFinite(n) || n < 0 || n === prevKcal) return;
+    const res = await fetch(`/api/meal-items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kcal: n }),
     });
     if (!res.ok) {
       toast.error("수정 실패");
@@ -368,19 +385,44 @@ export default function Home() {
                 {open && (
                   <div className="border-t px-4 py-3 flex flex-col gap-1 text-sm text-neutral-600">
                     {m.share_count > 1 && (
-                      <div className="text-xs text-neutral-500 mb-1">
-                        {m.share_count}인 공유 · 내 몫만 기록됨
-                      </div>
+                      <div className="text-xs text-neutral-500 mb-1">{m.share_count}인 공유</div>
                     )}
-                    {m.items.map((it, i) => (
-                      <div key={i} className="flex justify-between">
-                        <span>
-                          {it.name}{" "}
-                          <span className="text-neutral-400 text-xs">{it.grams}g</span>
-                        </span>
-                        <span className="tabular-nums text-neutral-500">{it.kcal} kcal</span>
-                      </div>
-                    ))}
+                    {m.items.map((it) => {
+                      const itemEditing = editingItemId === it.id;
+                      return (
+                        <div key={it.id} className="flex justify-between items-center">
+                          <span>
+                            {it.name}{" "}
+                            <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                          </span>
+                          {itemEditing ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editKcal}
+                              onChange={(e) => setEditKcal(e.target.value)}
+                              onBlur={() => saveItemEdit(it.id, it.kcal)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                                else if (e.key === "Escape") setEditingItemId(null);
+                              }}
+                              className="w-20 text-right tabular-nums text-neutral-700 bg-transparent border-b border-neutral-400 outline-none"
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingItemId(it.id);
+                                setEditKcal(it.kcal.toString());
+                              }}
+                              className="tabular-nums text-neutral-500 hover:underline"
+                            >
+                              {it.kcal} kcal
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </Card>
