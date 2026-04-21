@@ -309,108 +309,122 @@ export default function Home() {
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "오늘 식사에 저장"}
           </Button>
 
-          {items.map((it, itIdx) => {
-            const picked = it.candidates[it.selectedIdx];
-            const pickedKcal = candKcal(picked);
-            return (
-              <section key={itIdx} className={`flex flex-col gap-2 ${it.included ? "" : "opacity-50"}`}>
-                <div className="flex items-center justify-between px-1">
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={it.included}
-                      onChange={(e) => updateItem(itIdx, { included: e.target.checked })}
-                    />
-                    <span>{it.label ?? `음식 ${itIdx + 1}`}</span>
-                  </label>
-                  <span className="text-sm tabular-nums text-green-600">
-                    {pickedKcal == null ? "?" : `${pickedKcal} kcal`}
-                  </span>
-                </div>
-
-                {it.candidates.map((c, cIdx) => {
-                  const selected = cIdx === it.selectedIdx;
+          {(() => {
+            const groups = new Map<string, number[]>();
+            items.forEach((it, idx) => {
+              const key = it.label ?? "기타";
+              const arr = groups.get(key) ?? [];
+              arr.push(idx);
+              groups.set(key, arr);
+            });
+            return [...groups.entries()].map(([label, idxs]) => (
+              <section key={label} className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium text-neutral-700 px-1">{label}</h3>
+                {idxs.map((itIdx) => {
+                  const it = items[itIdx];
+                  const c = it.candidates[it.selectedIdx];
                   const kcal = candKcal(c);
                   return (
                     <Card
-                      key={cIdx}
-                      onClick={() => updateItem(itIdx, { selectedIdx: cIdx })}
-                      className={`cursor-pointer transition ${
-                        selected
-                          ? "border-green-600 border-2"
-                          : c.food_id
-                            ? "opacity-60"
-                            : "opacity-60 border-amber-400"
+                      key={itIdx}
+                      className={`transition ${it.included ? "" : "opacity-40"} ${
+                        !c.food_id ? "border-amber-400" : ""
                       }`}
                     >
                       <CardHeader>
                         <CardTitle className="flex justify-between items-baseline gap-2">
                           <span className="flex items-center gap-2">
-                            <span
-                              className={`inline-block w-4 h-4 rounded-full border-2 ${
-                                selected ? "border-green-600 bg-green-600" : "border-neutral-300"
-                              }`}
-                            />
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600" />
                             {c.name}
                           </span>
-                          <span className="text-lg tabular-nums text-green-600">
-                            {kcal == null ? "?" : `${kcal} kcal`}
+                          <span className="flex items-center gap-3">
+                            <span className="text-lg tabular-nums text-green-600">
+                              {kcal == null ? "?" : `${kcal} kcal`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(itIdx, { included: !it.included })}
+                              className="text-xs text-neutral-400 hover:text-neutral-600 underline"
+                            >
+                              {it.included ? "제외" : "포함"}
+                            </button>
                           </span>
                         </CardTitle>
                       </CardHeader>
-                      {selected && (
-                        <CardContent className="flex flex-col gap-3">
-                          <div className="flex justify-between text-sm text-neutral-500">
-                            <span>중량</span>
-                            <span className="tabular-nums">{c.editedGrams} g</span>
-                          </div>
-                          <Slider
-                            min={50}
-                            max={800}
-                            step={50}
-                            value={[c.editedGrams]}
-                            onValueChange={(v) => {
-                              const next = Array.isArray(v) ? v[0] : v;
-                              updateCandidate(itIdx, cIdx, { editedGrams: next });
-                            }}
-                          />
-                          {!c.food_id && (
-                            <div className="flex flex-col gap-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                              <label className="text-xs text-amber-800">
-                                DB에 없는 음식 · 100g 기준 kcal 입력 (미리보기 전용, 저장되지 않음)
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  min={0}
-                                  max={2000}
-                                  step={10}
-                                  value={c.customKcalPer100g ?? ""}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    updateCandidate(itIdx, cIdx, {
-                                      customKcalPer100g: v === "" ? undefined : Number(v),
-                                    });
-                                  }}
-                                  placeholder="예: 150"
-                                  className="w-24 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm tabular-nums outline-none focus:border-amber-500"
-                                />
-                                <span className="text-xs text-neutral-500">kcal / 100g</span>
-                              </div>
+                      <CardContent className="flex flex-col gap-3">
+                        <div className="flex justify-between text-sm text-neutral-500">
+                          <span>중량</span>
+                          <span className="tabular-nums">{c.editedGrams} g</span>
+                        </div>
+                        <Slider
+                          min={50}
+                          max={800}
+                          step={50}
+                          value={[c.editedGrams]}
+                          onValueChange={(v) => {
+                            const next = Array.isArray(v) ? v[0] : v;
+                            updateCandidate(itIdx, it.selectedIdx, { editedGrams: next });
+                          }}
+                        />
+                        {!c.food_id && (
+                          <div className="flex flex-col gap-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                            <label className="text-xs text-amber-800">
+                              DB에 없는 음식 · 100g 기준 kcal 입력 (미리보기 전용, 저장되지 않음)
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={2000}
+                                step={10}
+                                value={c.customKcalPer100g ?? ""}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateCandidate(itIdx, it.selectedIdx, {
+                                    customKcalPer100g: v === "" ? undefined : Number(v),
+                                  });
+                                }}
+                                placeholder="예: 150"
+                                className="w-24 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm tabular-nums outline-none focus:border-amber-500"
+                              />
+                              <span className="text-xs text-neutral-500">kcal / 100g</span>
                             </div>
-                          )}
-                          <div className="text-xs text-neutral-400">
-                            신뢰도 {(c.confidence * 100).toFixed(0)}%
                           </div>
-                        </CardContent>
-                      )}
+                        )}
+                        {it.candidates.length > 1 && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-neutral-500 hover:text-neutral-700">
+                              다른 후보 ({it.candidates.length - 1})
+                            </summary>
+                            <div className="flex flex-col gap-1 mt-1">
+                              {it.candidates.map((alt, ai) =>
+                                ai === it.selectedIdx ? null : (
+                                  <button
+                                    key={ai}
+                                    type="button"
+                                    onClick={() => updateItem(itIdx, { selectedIdx: ai })}
+                                    className="text-left px-2 py-1 rounded hover:bg-neutral-100 text-neutral-700"
+                                  >
+                                    {alt.name}
+                                    {alt.kcal_per_100g != null &&
+                                      ` · ${Math.round((alt.kcal_per_100g * alt.editedGrams) / 100)} kcal`}
+                                  </button>
+                                ),
+                              )}
+                            </div>
+                          </details>
+                        )}
+                        <div className="text-xs text-neutral-400">
+                          신뢰도 {(c.confidence * 100).toFixed(0)}%
+                        </div>
+                      </CardContent>
                     </Card>
                   );
                 })}
               </section>
-            );
-          })}
+            ));
+          })()}
         </section>
       )}
 
