@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 const SYSTEM_PROMPT = `너는 음식 사진 영양 분석 전문가다. 한국에서 실제로 먹는 모든 요리(한식·일식·중식·양식·디저트·음료·간식)를 다룬다. 사진 속 각 음식을 식별해, **식약처 공식 DB에서 검색되는 구체적 한국어 이름**으로 JSON만 반환하라.`;
 
 const USER_PROMPT = `반환 형식(JSON만, 설명 금지):
-{"items":[{"label":"분류","candidates":[{"name":"구체명","grams":정수,"confidence":0-1}]}]}
+{"items":[{"label":"분류","candidates":[{"name":"구체명","grams":정수,"kcal_per_100g":정수,"confidence":0-1}]}]}
 
 [분류 label] — 아래 중 가장 맞는 하나:
   "밥/면", "국/찌개", "반찬", "메인", "일식", "중식", "양식", "디저트", "음료", "간식"
@@ -30,10 +30,16 @@ const USER_PROMPT = `반환 형식(JSON만, 설명 금지):
   음료는 ml을 g로 간주해 grams에 입력.
   디저트 1조각: 케이크 약 120g, 쿠키 1개 약 20g, 도넛 1개 약 60g.
 
+[kcal_per_100g]
+  각 후보에 해당 음식의 일반적인 **100g당 kcal**을 정수로 반드시 포함. 모르면 동종 음식 평균 근사치. 공란·null·-1 금지.
+  참고 평균: 밥 140, 국/찌개 40~80, 구이생선 200, 불고기 210, 볶음반찬 120, 김치류 20~30,
+  파전 230, 계란요리 150, 케이크 350~420, 크림케이크 380, 쿠키 480, 초콜릿 550,
+  카페라떼 60, 아메리카노 5, 피자 260, 파스타 170, 라멘 140, 짜장면 180, 탕수육 230.
+
 [items 구성]
   - 사진에 보이는 서로 다른 음식마다 item 하나 (한상차림 1~6개, 단일 1개).
   - 같은 그릇은 쪼개지 말 것. 다른 그릇/반찬은 별도 item.
-  - 각 item의 candidates는 top 1~3 (가장 가능성 높은 것 먼저).`;
+  - 각 item의 candidates는 top 1~3 (가장 가능성 높은 것 먼저). 이름이 애매하면 2~3개 제시.`;
 
 export async function POST(req: Request) {
   const supabase = await supabaseServer();
@@ -92,10 +98,20 @@ export async function POST(req: Request) {
     label: it.label ?? null,
     candidates: it.candidates.map((c) => {
       const f = map.get(c.name.trim());
+      if (f) {
+        return {
+          ...c,
+          food_id: f.food_id,
+          kcal_per_100g: f.kcal_per_100g,
+          source: "db" as const,
+        };
+      }
+      const fallback = c.kcal_per_100g != null && c.kcal_per_100g > 0 ? c.kcal_per_100g : 150;
       return {
         ...c,
-        food_id: f?.food_id ?? null,
-        kcal_per_100g: f?.kcal_per_100g ?? null,
+        food_id: null,
+        kcal_per_100g: fallback,
+        source: "llm" as const,
       };
     }),
   }));

@@ -4,8 +4,9 @@ export const FoodCandidate = z.object({
   name: z.string().min(1),
   grams: z.number().positive(),
   confidence: z.number().min(0).max(1),
+  kcal_per_100g: z.number().nonnegative().optional(),
   food_id: z.string().nullable().optional(),
-  kcal_per_100g: z.number().nullable().optional(),
+  source: z.enum(["db", "llm"]).optional(),
 });
 
 export const RecognitionItem = z.object({

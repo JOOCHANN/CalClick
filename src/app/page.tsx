@@ -12,7 +12,7 @@ import { resizeImage } from "@/lib/image-resize";
 import { supabaseBrowser } from "@/services/supabase";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
-type EditableCandidate = FoodCandidate & { editedGrams: number; customKcalPer100g?: number };
+type EditableCandidate = FoodCandidate & { editedGrams: number };
 type EditableItem = {
   label: string | null;
   candidates: EditableCandidate[];
@@ -54,15 +54,8 @@ function snap(g: number): number {
   return Math.max(50, Math.round(g / 50) * 50);
 }
 
-function effectiveKcalPer100g(c: EditableCandidate): number | null {
-  if (c.kcal_per_100g != null) return c.kcal_per_100g;
-  if (c.customKcalPer100g != null && c.customKcalPer100g > 0) return c.customKcalPer100g;
-  return null;
-}
-
-function candKcal(c: EditableCandidate): number | null {
-  const k = effectiveKcalPer100g(c);
-  if (k == null) return null;
+function candKcal(c: EditableCandidate): number {
+  const k = c.kcal_per_100g ?? 0;
   return Math.round((k * c.editedGrams) / 100);
 }
 
@@ -577,22 +570,31 @@ export default function Home() {
                   const it = items[itIdx];
                   const c = it.candidates[it.selectedIdx];
                   const kcal = candKcal(c);
+                  const isLlm = c.source === "llm";
                   return (
                     <Card
                       key={itIdx}
-                      className={`transition ${it.included ? "" : "opacity-40"} ${
-                        !c.food_id ? "border-amber-400" : ""
-                      }`}
+                      className={`transition ${it.included ? "" : "opacity-40"}`}
                     >
                       <CardHeader>
                         <CardTitle className="flex justify-between items-baseline gap-2">
-                          <span className="flex items-center gap-2">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600" />
-                            {c.name}
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600 shrink-0" />
+                            <span className="truncate">{c.name}</span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+                                isLlm
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                              }`}
+                              title={isLlm ? "AI가 추정한 칼로리" : "식약처 DB에서 가져온 칼로리"}
+                            >
+                              {isLlm ? "AI 추정" : "DB"}
+                            </span>
                           </span>
-                          <span className="flex items-center gap-3">
+                          <span className="flex items-center gap-3 shrink-0">
                             <span className="text-lg tabular-nums text-green-600">
-                              {kcal == null ? "?" : `${kcal} kcal`}
+                              {kcal} kcal
                             </span>
                             <button
                               type="button"
@@ -619,32 +621,6 @@ export default function Home() {
                             updateCandidate(itIdx, it.selectedIdx, { editedGrams: next });
                           }}
                         />
-                        {!c.food_id && (
-                          <div className="flex flex-col gap-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                            <label className="text-xs text-amber-800">
-                              DB에 없는 음식 · 100g 기준 kcal 입력 (미리보기 전용, 저장되지 않음)
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                min={0}
-                                max={2000}
-                                step={10}
-                                value={c.customKcalPer100g ?? ""}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  updateCandidate(itIdx, it.selectedIdx, {
-                                    customKcalPer100g: v === "" ? undefined : Number(v),
-                                  });
-                                }}
-                                placeholder="예: 150"
-                                className="w-24 rounded-md border border-amber-300 bg-white px-2 py-1 text-sm tabular-nums outline-none focus:border-amber-500"
-                              />
-                              <span className="text-xs text-neutral-500">kcal / 100g</span>
-                            </div>
-                          </div>
-                        )}
                         {it.candidates.length > 1 && (
                           <details className="text-xs">
                             <summary className="cursor-pointer text-neutral-500 hover:text-neutral-700">
@@ -657,11 +633,25 @@ export default function Home() {
                                     key={ai}
                                     type="button"
                                     onClick={() => updateItem(itIdx, { selectedIdx: ai })}
-                                    className="text-left px-2 py-1 rounded hover:bg-neutral-100 text-neutral-700"
+                                    className="text-left px-2 py-1 rounded hover:bg-neutral-100 text-neutral-700 flex justify-between items-center"
                                   >
-                                    {alt.name}
-                                    {alt.kcal_per_100g != null &&
-                                      ` · ${Math.round((alt.kcal_per_100g * alt.editedGrams) / 100)} kcal`}
+                                    <span className="flex items-center gap-1.5">
+                                      {alt.name}
+                                      <span
+                                        className={`text-[9px] px-1 py-0.5 rounded ${
+                                          alt.source === "llm"
+                                            ? "bg-amber-100 text-amber-700"
+                                            : "bg-emerald-100 text-emerald-700"
+                                        }`}
+                                      >
+                                        {alt.source === "llm" ? "AI" : "DB"}
+                                      </span>
+                                    </span>
+                                    {alt.kcal_per_100g != null && (
+                                      <span className="text-neutral-500 tabular-nums">
+                                        {Math.round((alt.kcal_per_100g * alt.editedGrams) / 100)} kcal
+                                      </span>
+                                    )}
                                   </button>
                                 ),
                               )}
