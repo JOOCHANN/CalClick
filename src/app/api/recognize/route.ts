@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOpenAI } from "@/services/openai";
 import { RecognitionResult } from "@/types/recognition";
-import { findFoodsByAliases } from "@/services/foods";
+import { findFoodCandidatesForName } from "@/services/foods";
 import { supabaseServer } from "@/services/supabase-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -92,28 +92,60 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "schema validation failed" }, { status: 502 });
   }
 
-  const allNames = result.data.items.flatMap((it) => it.candidates.map((c) => c.name));
-  const map = await findFoodsByAliases(allNames);
-  const enrichedItems = result.data.items.map((it) => ({
-    label: it.label ?? null,
-    candidates: it.candidates.map((c) => {
-      const f = map.get(c.name.trim());
-      if (f) {
-        return {
-          ...c,
-          food_id: f.food_id,
-          kcal_per_100g: f.kcal_per_100g,
-          source: "db" as const,
-        };
+  const enrichedItems = await Promise.all(
+    result.data.items.map(async (it) => {
+      const merged: Array<{
+        name: string;
+        grams: number;
+        confidence: number;
+        kcal_per_100g: number;
+        food_id: string | null;
+        source: "db" | "llm";
+      }> = [];
+      const seenFoodIds = new Set<string>();
+      const seenNames = new Set<string>();
+
+      for (const c of it.candidates) {
+        const dbMatches = await findFoodCandidatesForName(c.name, 3);
+        if (dbMatches.length > 0) {
+          dbMatches.forEach((f, idx) => {
+            if (seenFoodIds.has(f.food_id)) return;
+            seenFoodIds.add(f.food_id);
+            merged.push({
+              name: f.official_name,
+              grams: c.grams,
+              confidence: idx === 0 ? c.confidence : c.confidence * 0.85,
+              kcal_per_100g: f.kcal_per_100g,
+              food_id: f.food_id,
+              source: "db",
+            });
+          });
+        } else if (!seenNames.has(c.name)) {
+          seenNames.add(c.name);
+          const fallback = c.kcal_per_100g != null && c.kcal_per_100g > 0 ? c.kcal_per_100g : 150;
+          merged.push({
+            name: c.name,
+            grams: c.grams,
+            confidence: c.confidence,
+            kcal_per_100g: fallback,
+            food_id: null,
+            source: "llm",
+          });
+        }
       }
-      const fallback = c.kcal_per_100g != null && c.kcal_per_100g > 0 ? c.kcal_per_100g : 150;
-      return {
-        ...c,
-        food_id: null,
-        kcal_per_100g: fallback,
-        source: "llm" as const,
-      };
+      if (merged.length === 0) {
+        const c = it.candidates[0];
+        merged.push({
+          name: c.name,
+          grams: c.grams,
+          confidence: c.confidence,
+          kcal_per_100g: c.kcal_per_100g ?? 150,
+          food_id: null,
+          source: "llm",
+        });
+      }
+      return { label: it.label ?? null, candidates: merged };
     }),
-  }));
+  );
   return NextResponse.json({ items: enrichedItems });
 }

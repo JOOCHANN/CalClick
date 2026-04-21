@@ -83,6 +83,8 @@ export default function Home() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editKcal, setEditKcal] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [editingNameKey, setEditingNameKey] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
@@ -293,6 +295,7 @@ export default function Home() {
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">CalClick</h1>
         <div className="flex gap-3 text-xs text-neutral-500">
+          <Link href="/me" className="underline">통계</Link>
           <Link href="/settings" className="underline">설정</Link>
           <button
             type="button"
@@ -577,7 +580,41 @@ export default function Home() {
                         <CardTitle className="flex justify-between items-baseline gap-2">
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600 shrink-0" />
-                            <span className="truncate">{c.name}</span>
+                            {(() => {
+                              const nameKey = `${itIdx}-${it.selectedIdx}`;
+                              const isEditing = editingNameKey === nameKey;
+                              return isEditing ? (
+                                <input
+                                  autoFocus
+                                  value={nameDraft}
+                                  onChange={(e) => setNameDraft(e.target.value)}
+                                  onBlur={() => {
+                                    const next = nameDraft.trim();
+                                    setEditingNameKey(null);
+                                    if (next && next !== c.name) {
+                                      updateCandidate(itIdx, it.selectedIdx, { name: next });
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.currentTarget.blur();
+                                    else if (e.key === "Escape") setEditingNameKey(null);
+                                  }}
+                                  className="min-w-0 flex-1 bg-transparent border-b border-green-600 outline-none"
+                                />
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingNameKey(nameKey);
+                                    setNameDraft(c.name);
+                                  }}
+                                  className="truncate text-left hover:underline"
+                                  title="이름 수정"
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })()}
                             <span
                               className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
                                 isLlm

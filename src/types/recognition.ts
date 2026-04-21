@@ -11,7 +11,7 @@ export const FoodCandidate = z.object({
 
 export const RecognitionItem = z.object({
   label: z.string().nullable().optional(),
-  candidates: z.array(FoodCandidate).min(1).max(3),
+  candidates: z.array(FoodCandidate).min(1).max(10),
 });
 
 export const RecognitionResult = z.object({
