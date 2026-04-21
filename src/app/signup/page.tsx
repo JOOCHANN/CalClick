@@ -85,7 +85,10 @@ export default function SignupPage() {
             className="mt-1"
           />
           <span>
-            식사 사진·기록 수집 및 처리에 동의합니다 (앱 사용 목적, 계정 삭제 시 즉시 파기).
+            식사 사진·기록 수집 및 처리에 동의합니다 (앱 사용 목적, 계정 삭제 시 즉시 파기).{" "}
+            <Link href="/privacy" className="text-green-600 underline">
+              자세히
+            </Link>
           </span>
         </label>
         <Button type="submit" disabled={loading}>

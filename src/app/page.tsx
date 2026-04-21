@@ -128,16 +128,19 @@ export default function Home() {
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-6">
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">CalClick</h1>
-        <button
-          type="button"
-          onClick={async () => {
-            await supabaseBrowser().auth.signOut();
-            location.href = "/login";
-          }}
-          className="text-xs text-neutral-500 underline"
-        >
-          로그아웃
-        </button>
+        <div className="flex gap-3 text-xs text-neutral-500">
+          <a href="/settings" className="underline">설정</a>
+          <button
+            type="button"
+            onClick={async () => {
+              await supabaseBrowser().auth.signOut();
+              location.href = "/login";
+            }}
+            className="underline"
+          >
+            로그아웃
+          </button>
+        </div>
       </header>
 
       <section className="flex flex-col items-center py-4">
