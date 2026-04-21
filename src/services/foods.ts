@@ -1,5 +1,8 @@
 import "server-only";
-import { supabaseServer } from "./supabase-server";
+import { createClient } from "@supabase/supabase-js";
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export type FoodLookup = {
   food_id: string;
@@ -7,22 +10,35 @@ export type FoodLookup = {
   kcal_per_100g: number;
 };
 
+function publicClient() {
+  return createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export async function findFoodByAlias(name: string): Promise<FoodLookup | null> {
-  const alias = name.trim();
-  if (!alias) return null;
-  const supabase = await supabaseServer();
+  const map = await findFoodsByAliases([name]);
+  return map.get(name.trim()) ?? null;
+}
+
+export async function findFoodsByAliases(
+  names: string[],
+): Promise<Map<string, FoodLookup>> {
+  const trimmed = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
+  const result = new Map<string, FoodLookup>();
+  if (trimmed.length === 0) return result;
+
+  const supabase = publicClient();
   const { data, error } = await supabase
     .from("food_aliases")
-    .select("food_id, foods!inner(food_id, official_name, kcal_per_100g)")
-    .eq("alias", alias)
-    .maybeSingle();
-  if (error || !data) return null;
-  const f = (data as unknown as { foods: FoodLookup }).foods;
-  return {
-    food_id: f.food_id,
-    official_name: f.official_name,
-    kcal_per_100g: f.kcal_per_100g,
-  };
+    .select("alias, foods!inner(food_id, official_name, kcal_per_100g)")
+    .in("alias", trimmed);
+  if (error || !data) return result;
+
+  for (const row of data as unknown as Array<{ alias: string; foods: FoodLookup }>) {
+    result.set(row.alias, row.foods);
+  }
+  return result;
 }
 
 export function computeKcal(kcalPer100g: number, grams: number): number {

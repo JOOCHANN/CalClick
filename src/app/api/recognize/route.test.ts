@@ -10,6 +10,7 @@ vi.mock("@/services/openai", () => ({
 
 vi.mock("@/services/foods", () => ({
   findFoodByAlias: vi.fn(async () => null),
+  findFoodsByAliases: vi.fn(async () => new Map()),
 }));
 
 import { POST } from "./route";

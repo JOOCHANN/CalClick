@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOpenAI } from "@/services/openai";
 import { RecognitionResult } from "@/types/recognition";
-import { findFoodByAlias } from "@/services/foods";
+import { findFoodsByAliases } from "@/services/foods";
 
 export const runtime = "nodejs";
 
@@ -53,15 +53,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "schema validation failed" }, { status: 502 });
   }
 
-  const enriched = await Promise.all(
-    result.data.candidates.map(async (c) => {
-      const f = await findFoodByAlias(c.name);
-      return {
-        ...c,
-        food_id: f?.food_id ?? null,
-        kcal_per_100g: f?.kcal_per_100g ?? null,
-      };
-    }),
-  );
+  const map = await findFoodsByAliases(result.data.candidates.map((c) => c.name));
+  const enriched = result.data.candidates.map((c) => {
+    const f = map.get(c.name.trim());
+    return {
+      ...c,
+      food_id: f?.food_id ?? null,
+      kcal_per_100g: f?.kcal_per_100g ?? null,
+    };
+  });
   return NextResponse.json({ candidates: enriched });
 }
