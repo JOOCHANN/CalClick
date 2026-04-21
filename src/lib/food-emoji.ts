@@ -50,6 +50,13 @@ const RULES: Array<{ test: RegExp; emoji: string }> = [
   { test: /(팝콘)/, emoji: "🍿" },
 ];
 
+export const EMOJI_PALETTE: string[] = [
+  "🍚", "🍜", "🍲", "🍛", "🥗",
+  "🥩", "🍗", "🐟", "🍣", "🥟",
+  "🍕", "🍔", "🍝", "🥪", "🌮",
+  "🍰", "🍩", "🍎", "☕️", "🍽️",
+];
+
 export function foodEmoji(name: string): string {
   for (const { test, emoji } of RULES) {
     if (test.test(name)) return emoji;

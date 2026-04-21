@@ -6,6 +6,7 @@ const PatchSchema = z.object({
   kcal: z.number().nonnegative().max(10000).optional(),
   grams: z.number().positive().max(5000).optional(),
   name: z.string().trim().min(1).max(100).optional(),
+  emoji: z.string().trim().min(1).max(8).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

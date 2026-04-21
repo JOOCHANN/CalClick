@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
-import { foodEmoji } from "@/lib/food-emoji";
+import { foodEmoji, EMOJI_PALETTE } from "@/lib/food-emoji";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
 type EditableCandidate = FoodCandidate & { editedGrams: number };
@@ -25,7 +25,7 @@ type TodayMeal = {
   meal_type: MealType | null;
   total_kcal: number;
   share_count: number;
-  items: { id: string; name: string; grams: number; kcal: number }[];
+  items: { id: string; name: string; grams: number; kcal: number; emoji: string | null }[];
 };
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -89,7 +89,7 @@ export default function Home() {
   const [nameDraft, setNameDraft] = useState("");
   const [editModeMealId, setEditModeMealId] = useState<string | null>(null);
   const [itemDrafts, setItemDrafts] = useState<
-    Record<string, { name: string; grams: string; kcal: string }>
+    Record<string, { name: string; grams: string; kcal: string; emoji: string }>
   >({});
   const [savingMeal, setSavingMeal] = useState(false);
   const todayLabel = formatToday();
@@ -153,7 +153,12 @@ export default function Home() {
   const enterMealEdit = (m: TodayMeal) => {
     const drafts: typeof itemDrafts = {};
     m.items.forEach((it) => {
-      drafts[it.id] = { name: it.name, grams: String(it.grams), kcal: String(it.kcal) };
+      drafts[it.id] = {
+        name: it.name,
+        grams: String(it.grams),
+        kcal: String(it.kcal),
+        emoji: it.emoji ?? "",
+      };
     });
     setItemDrafts(drafts);
     setEditModeMealId(m.id);
@@ -176,9 +181,11 @@ export default function Home() {
           const n = d.name.trim();
           const g = Number(d.grams);
           const k = Math.round(Number(d.kcal));
+          const e = d.emoji.trim();
           if (n && n !== it.name) body.name = n;
           if (Number.isFinite(g) && g > 0 && g !== it.grams) body.grams = g;
           if (Number.isFinite(k) && k >= 0 && k !== it.kcal) body.kcal = k;
+          if (e && e !== (it.emoji ?? "")) body.emoji = e;
           return Object.keys(body).length === 0 ? null : { id: it.id, body };
         })
         .filter((x): x is { id: string; body: Record<string, string | number> } => x !== null);
@@ -551,7 +558,7 @@ export default function Home() {
                         <div key={it.id} className="flex justify-between items-center">
                           <span className="flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
-                              {foodEmoji(it.name)}
+                              {it.emoji ?? foodEmoji(it.name)}
                             </span>
                             <span>
                               {it.name}{" "}
@@ -603,32 +610,53 @@ export default function Home() {
                         name: it.name,
                         grams: String(it.grams),
                         kcal: String(it.kcal),
+                        emoji: it.emoji ?? "",
                       };
                       const setDraft = (patch: Partial<typeof draft>) =>
                         setItemDrafts((prev) => ({ ...prev, [it.id]: { ...draft, ...patch } }));
+                      const currentEmoji = draft.emoji || it.emoji || foodEmoji(it.name);
                       return (
-                        <div
-                          key={it.id}
-                          className="grid grid-cols-[1fr_70px_80px] gap-2 items-center"
-                        >
-                          <input
-                            type="text"
-                            value={draft.name}
-                            onChange={(e) => setDraft({ name: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500"
-                          />
-                          <input
-                            type="number"
-                            value={draft.grams}
-                            onChange={(e) => setDraft({ grams: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
-                          />
-                          <input
-                            type="number"
-                            value={draft.kcal}
-                            onChange={(e) => setDraft({ kcal: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
-                          />
+                        <div key={it.id} className="flex flex-col gap-2">
+                          <div className="grid grid-cols-[1fr_70px_80px] gap-2 items-center">
+                            <input
+                              type="text"
+                              value={draft.name}
+                              onChange={(e) => setDraft({ name: e.target.value })}
+                              className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500"
+                            />
+                            <input
+                              type="number"
+                              value={draft.grams}
+                              onChange={(e) => setDraft({ grams: e.target.value })}
+                              className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
+                            />
+                            <input
+                              type="number"
+                              value={draft.kcal}
+                              onChange={(e) => setDraft({ kcal: e.target.value })}
+                              className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
+                            />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1 pl-0.5">
+                            <span className="text-[10px] text-neutral-500 mr-1">스티커</span>
+                            {EMOJI_PALETTE.map((em) => {
+                              const selected = currentEmoji === em;
+                              return (
+                                <button
+                                  key={em}
+                                  type="button"
+                                  onClick={() => setDraft({ emoji: em })}
+                                  className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition active:scale-90 ${
+                                    selected
+                                      ? "bg-brand-500 ring-2 ring-brand-500 shadow-md scale-110"
+                                      : "bg-white hover:bg-cream-100 ring-1 ring-neutral-200"
+                                  }`}
+                                >
+                                  {em}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })}
@@ -796,7 +824,6 @@ export default function Home() {
                   const it = items[itIdx];
                   const c = it.candidates[it.selectedIdx];
                   const kcal = candKcal(c);
-                  const isLlm = c.source === "llm";
                   return (
                     <Card
                       key={itIdx}
@@ -841,16 +868,6 @@ export default function Home() {
                                 </button>
                               );
                             })()}
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
-                                isLlm
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-mint-100 text-mint-600"
-                              }`}
-                              title={isLlm ? "AI가 추정한 칼로리" : "식약처 DB에서 가져온 칼로리"}
-                            >
-                              {isLlm ? "AI 추정" : "DB"}
-                            </span>
                           </span>
                           <span className="flex items-center gap-3 shrink-0">
                             <span className="text-lg tabular-nums text-brand-600">
@@ -881,43 +898,6 @@ export default function Home() {
                             updateCandidate(itIdx, it.selectedIdx, { editedGrams: next });
                           }}
                         />
-                        {it.candidates.length > 1 && (
-                          <details className="text-xs">
-                            <summary className="cursor-pointer text-neutral-500 hover:text-neutral-700">
-                              다른 후보 ({it.candidates.length - 1})
-                            </summary>
-                            <div className="flex flex-col gap-1 mt-1">
-                              {it.candidates.map((alt, ai) =>
-                                ai === it.selectedIdx ? null : (
-                                  <button
-                                    key={ai}
-                                    type="button"
-                                    onClick={() => updateItem(itIdx, { selectedIdx: ai })}
-                                    className="text-left px-2 py-1 rounded hover:bg-neutral-100 text-neutral-700 flex justify-between items-center"
-                                  >
-                                    <span className="flex items-center gap-1.5">
-                                      {alt.name}
-                                      <span
-                                        className={`text-[9px] px-1 py-0.5 rounded ${
-                                          alt.source === "llm"
-                                            ? "bg-amber-100 text-amber-700"
-                                            : "bg-mint-100 text-mint-600"
-                                        }`}
-                                      >
-                                        {alt.source === "llm" ? "AI" : "DB"}
-                                      </span>
-                                    </span>
-                                    {alt.kcal_per_100g != null && (
-                                      <span className="text-neutral-500 tabular-nums">
-                                        {Math.round((alt.kcal_per_100g * alt.editedGrams) / 100)} kcal
-                                      </span>
-                                    )}
-                                  </button>
-                                ),
-                              )}
-                            </div>
-                          </details>
-                        )}
                       </CardContent>
                     </Card>
                   );

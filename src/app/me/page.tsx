@@ -27,6 +27,7 @@ type DayItem = {
   name: string;
   grams: number;
   kcal: number;
+  emoji: string | null;
   source: "db" | "llm";
   food_id: string | null;
   kcal_per_100g: number | null;
@@ -334,7 +335,7 @@ export default function MePage() {
                               <div className="flex justify-between items-center text-sm text-neutral-600 gap-2">
                                 <span className="truncate flex items-center gap-1.5 min-w-0">
                                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
-                                    {foodEmoji(it.name)}
+                                    {it.emoji ?? foodEmoji(it.name)}
                                   </span>
                                   <span className="truncate">
                                     {it.name}{" "}

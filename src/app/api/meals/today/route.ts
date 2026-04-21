@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("meals")
     .select(
-      "id, eaten_at, meal_type, total_kcal, share_count, photo_path, meal_items(id, grams, kcal, name, source, food_id, foods(official_name, kcal_per_100g, carb_g, protein_g, fat_g, source))",
+      "id, eaten_at, meal_type, total_kcal, share_count, photo_path, meal_items(id, grams, kcal, name, source, food_id, emoji, foods(official_name, kcal_per_100g, carb_g, protein_g, fat_g, source))",
     )
     .gte("eaten_at", from)
     .lt("eaten_at", to)
@@ -51,12 +51,14 @@ export async function GET(request: Request) {
         name?: string | null;
         source?: string | null;
         food_id?: string | null;
+        emoji?: string | null;
       };
       return {
         id: raw.id,
         name: f?.official_name ?? raw.name ?? "(이름없음)",
         grams: it.grams,
         kcal: it.kcal,
+        emoji: raw.emoji ?? null,
         source: (raw.source ?? (f ? "db" : "llm")) as "db" | "llm",
         food_id: raw.food_id ?? null,
         kcal_per_100g: f?.kcal_per_100g ?? null,
