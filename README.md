@@ -2,6 +2,17 @@
 
 한상차림 1장을 찍으면 국·밥·반찬을 각각 인식하고, 식약처·농진청 공식 DB에서 칼로리를 찾아, 공유 식사는 인원수로 나눠 계산하는 한국 식단 관리 PWA.
 
+## 🚀 지금 체험하기
+
+**데모 링크**: [https://calclick.green261535.workers.dev](https://calclick.green261535.workers.dev)
+
+1. 이메일로 가입 (이메일 인증 없이 바로 사용 가능 — 데모용)
+2. 홈 화면에서 음식 사진 촬영/선택 → **분석**
+3. 상위 후보 중 하나 선택 → **오늘 식사에 저장**
+4. 상단 "오늘 섭취 kcal"에 반영
+
+> ⚠️ 데모 단계라 데이터는 예고 없이 초기화될 수 있습니다. 개인정보는 [설정 → 계정 삭제]에서 즉시 영구 삭제 가능.
+
 ## 스택
 Next.js 15 · Tailwind · shadcn/ui · Supabase · OpenAI GPT-4o Vision · Cloudflare Workers (via `@opennextjs/cloudflare`) · Cloudflare AI Gateway
 

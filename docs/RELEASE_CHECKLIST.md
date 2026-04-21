@@ -3,7 +3,7 @@
 실 서비스 공개 전 반드시 확인. 개발/데모 단계는 통과 가능.
 
 ## 인증
-- [ ] Supabase **Authentication → Sign In / Providers → Confirm email 토글 ON** (현재 데모용 OFF)
+- [ ] Supabase **Authentication → Sign In / Providers → Confirm email 토글 ON** (현재 데모용 OFF — 공개 서비스 전 반드시 켤 것)
 - [ ] 또는 Magic Link / OAuth 전환 결정
 - [ ] Password 최소 길이 / 복잡도 정책 검토 (현재 6자)
 
