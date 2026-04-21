@@ -33,11 +33,33 @@ export async function findFoodsByAliases(
     .from("food_aliases")
     .select("alias, foods!inner(food_id, official_name, kcal_per_100g)")
     .in("alias", trimmed);
-  if (error || !data) return result;
-
-  for (const row of data as unknown as Array<{ alias: string; foods: FoodLookup }>) {
-    result.set(row.alias, row.foods);
+  if (!error && data) {
+    for (const row of data as unknown as Array<{ alias: string; foods: FoodLookup }>) {
+      result.set(row.alias, row.foods);
+    }
   }
+
+  const unresolved = trimmed.filter((n) => !result.has(n));
+  if (unresolved.length > 0) {
+    await Promise.all(
+      unresolved.map(async (name) => {
+        const { data: fuzzy } = await supabase
+          .from("foods")
+          .select("food_id, official_name, kcal_per_100g")
+          .ilike("official_name", `%${name}%`)
+          .limit(30);
+        if (!fuzzy || fuzzy.length === 0) return;
+        const EXCLUDE = ["(R)", "(S)", "(L)", "(F)", "(Tall)", "(Venti)", "간편조리세트"];
+        const filtered = fuzzy.filter(
+          (r) => !EXCLUDE.some((w) => r.official_name.includes(w)),
+        );
+        const pool = filtered.length > 0 ? filtered : fuzzy;
+        const best = pool.sort((a, b) => a.official_name.length - b.official_name.length)[0];
+        result.set(name, best as FoodLookup);
+      }),
+    );
+  }
+
   return result;
 }
 
