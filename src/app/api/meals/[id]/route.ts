@@ -10,8 +10,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const { error } = await supabase.from("meals").delete().eq("id", id);
+  const { data, error } = await supabase
+    .from("meals")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "not_found_or_forbidden" }, { status: 404 });
+  }
   return NextResponse.json({ ok: true });
 }
 
