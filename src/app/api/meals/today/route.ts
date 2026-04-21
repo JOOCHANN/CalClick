@@ -17,12 +17,30 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from("meals")
-    .select("total_kcal")
+    .select("id, eaten_at, meal_type, total_kcal, share_count, meal_items(grams, kcal, foods(official_name))")
     .gte("eaten_at", from)
-    .lt("eaten_at", to);
+    .lt("eaten_at", to)
+    .order("eaten_at", { ascending: true });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const total = (data ?? []).reduce((s, r) => s + (r.total_kcal ?? 0), 0);
-  return NextResponse.json({ total_kcal: total });
+  const rows = data ?? [];
+  const total = rows.reduce((s, r) => s + (r.total_kcal ?? 0), 0);
+  const meals = rows.map((r) => ({
+    id: r.id,
+    eaten_at: r.eaten_at,
+    meal_type: r.meal_type,
+    total_kcal: r.total_kcal,
+    share_count: r.share_count,
+    items: (r.meal_items ?? []).map((it) => {
+      const f = it.foods as unknown as { official_name: string } | { official_name: string }[] | null;
+      const name = Array.isArray(f) ? f[0]?.official_name : f?.official_name;
+      return {
+        name: name ?? "(이름없음)",
+        grams: it.grams,
+        kcal: it.kcal,
+      };
+    }),
+  }));
+  return NextResponse.json({ total_kcal: total, meals });
 }

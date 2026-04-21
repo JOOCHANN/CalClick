@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Loader2, Trash2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,15 @@ type EditableItem = {
   candidates: EditableCandidate[];
   selectedIdx: number;
   included: boolean;
+};
+
+type TodayMeal = {
+  id: string;
+  eaten_at: string;
+  meal_type: MealType | null;
+  total_kcal: number;
+  share_count: number;
+  items: { name: string; grams: number; kcal: number }[];
 };
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -74,6 +83,7 @@ export default function Home() {
   const [shareCount, setShareCount] = useState<number>(1);
   const [mealType, setMealType] = useState<MealType>(() => guessMealType());
   const [todayKcal, setTodayKcal] = useState<number>(0);
+  const [todayMeals, setTodayMeals] = useState<TodayMeal[]>([]);
   const [saving, setSaving] = useState(false);
   const todayLabel = formatToday();
 
@@ -85,7 +95,19 @@ export default function Home() {
     if (!res.ok) return;
     const data = await res.json();
     setTodayKcal(data.total_kcal ?? 0);
+    setTodayMeals(data.meals ?? []);
   }, []);
+
+  const onDeleteMeal = async (id: string) => {
+    if (!confirm("이 식사를 삭제할까요?")) return;
+    const res = await fetch(`/api/meals/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("삭제 실패");
+      return;
+    }
+    toast.success("삭제됨");
+    fetchToday();
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -247,6 +269,61 @@ export default function Home() {
         </span>
         <span className="text-xs text-neutral-500">kcal</span>
       </section>
+
+      {todayMeals.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-neutral-700 px-1">오늘 먹은 것</h2>
+          {todayMeals.map((m) => {
+            const d = new Date(m.eaten_at);
+            const time = `${d.getHours().toString().padStart(2, "0")}:${d
+              .getMinutes()
+              .toString()
+              .padStart(2, "0")}`;
+            const mealName = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
+            return (
+              <Card key={m.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex justify-between items-baseline gap-2 text-base">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-green-50 text-green-700 text-xs px-2 py-0.5">
+                        {mealName}
+                      </span>
+                      <span className="text-xs text-neutral-500 tabular-nums">{time}</span>
+                      {m.share_count > 1 && (
+                        <span className="text-xs text-neutral-500">÷{m.share_count}</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg tabular-nums text-green-600">
+                        {m.total_kcal} kcal
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteMeal(m.id)}
+                        aria-label="삭제"
+                        className="text-neutral-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-1 text-sm text-neutral-600">
+                  {m.items.map((it, i) => (
+                    <div key={i} className="flex justify-between">
+                      <span>
+                        {it.name}{" "}
+                        <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                      </span>
+                      <span className="tabular-nums text-neutral-500">{it.kcal} kcal</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
+      )}
 
       <input
         ref={fileRef}
