@@ -20,6 +20,27 @@ type EditableItem = {
   included: boolean;
 };
 
+type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+const MEAL_LABELS: Record<MealType, string> = {
+  breakfast: "아침",
+  lunch: "점심",
+  dinner: "저녁",
+  snack: "간식",
+};
+
+function guessMealType(d = new Date()): MealType {
+  const h = d.getHours();
+  if (h >= 5 && h < 11) return "breakfast";
+  if (h >= 11 && h < 15) return "lunch";
+  if (h >= 17 && h < 22) return "dinner";
+  return "snack";
+}
+
+function formatToday(d = new Date()): string {
+  const week = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${week})`;
+}
+
 function snap(g: number): number {
   return Math.max(50, Math.round(g / 50) * 50);
 }
@@ -51,8 +72,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<EditableItem[] | null>(null);
   const [shareCount, setShareCount] = useState<number>(1);
+  const [mealType, setMealType] = useState<MealType>(() => guessMealType());
   const [todayKcal, setTodayKcal] = useState<number>(0);
   const [saving, setSaving] = useState(false);
+  const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
     const { from, to } = todayRange();
@@ -99,6 +122,7 @@ export default function Home() {
         body: JSON.stringify({
           candidates: savable.map((c) => ({ name: c.name, grams: c.editedGrams })),
           shareCount,
+          mealType,
         }),
       });
       const data = await res.json();
@@ -117,13 +141,12 @@ export default function Home() {
       }
       setItems(null);
       setShareCount(1);
+      setMealType(guessMealType());
       setFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
-      const base =
-        shareCount > 1
-          ? `${shareCount}명 공유: +${data.total_kcal} kcal 저장됨`
-          : `+${data.total_kcal} kcal 저장됨`;
+      const prefix = `${MEAL_LABELS[mealType]} +${data.total_kcal} kcal 저장됨`;
+      const base = shareCount > 1 ? `${prefix} (${shareCount}명 공유)` : prefix;
       toast.success(
         skipped.length > 0 ? `${base} (DB 미등록 제외: ${skipped.join(", ")})` : base,
       );
@@ -218,7 +241,7 @@ export default function Home() {
       </header>
 
       <section className="flex flex-col items-center py-4">
-        <span className="text-xs text-neutral-500">오늘 섭취</span>
+        <span className="text-xs text-neutral-500">오늘 섭취 · {todayLabel}</span>
         <span className="text-5xl font-semibold tabular-nums text-green-600">
           {todayKcal}
         </span>
@@ -276,7 +299,26 @@ export default function Home() {
 
       {items && (
         <section className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 rounded-xl bg-neutral-50 px-4 py-3">
+          <div className="flex flex-col gap-3 rounded-xl bg-neutral-50 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-neutral-600">끼니</span>
+              <div className="flex gap-1">
+                {(Object.keys(MEAL_LABELS) as MealType[]).map((mt) => (
+                  <button
+                    key={mt}
+                    type="button"
+                    onClick={() => setMealType(mt)}
+                    className={`px-3 h-9 rounded-full text-sm font-medium ${
+                      mealType === mt
+                        ? "bg-green-600 text-white"
+                        : "bg-white border border-neutral-200 text-neutral-600"
+                    }`}
+                  >
+                    {MEAL_LABELS[mt]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-neutral-600">함께 먹는 인원</span>
               <div className="flex gap-1">
