@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,11 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [editingNameKey, setEditingNameKey] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
+  const [editModeMealId, setEditModeMealId] = useState<string | null>(null);
+  const [itemDrafts, setItemDrafts] = useState<
+    Record<string, { name: string; grams: string; kcal: string }>
+  >({});
+  const [savingMeal, setSavingMeal] = useState(false);
   const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
@@ -141,6 +146,64 @@ export default function Home() {
       return;
     }
     fetchToday();
+  };
+
+  const enterMealEdit = (m: TodayMeal) => {
+    const drafts: typeof itemDrafts = {};
+    m.items.forEach((it) => {
+      drafts[it.id] = { name: it.name, grams: String(it.grams), kcal: String(it.kcal) };
+    });
+    setItemDrafts(drafts);
+    setEditModeMealId(m.id);
+    setExpandedId(m.id);
+  };
+
+  const exitMealEdit = () => {
+    setEditModeMealId(null);
+    setItemDrafts({});
+  };
+
+  const saveMealEdits = async (m: TodayMeal) => {
+    setSavingMeal(true);
+    try {
+      const patches = m.items
+        .map((it) => {
+          const d = itemDrafts[it.id];
+          if (!d) return null;
+          const body: Record<string, string | number> = {};
+          const n = d.name.trim();
+          const g = Number(d.grams);
+          const k = Math.round(Number(d.kcal));
+          if (n && n !== it.name) body.name = n;
+          if (Number.isFinite(g) && g > 0 && g !== it.grams) body.grams = g;
+          if (Number.isFinite(k) && k >= 0 && k !== it.kcal) body.kcal = k;
+          return Object.keys(body).length === 0 ? null : { id: it.id, body };
+        })
+        .filter((x): x is { id: string; body: Record<string, string | number> } => x !== null);
+
+      if (patches.length === 0) {
+        exitMealEdit();
+        return;
+      }
+      const results = await Promise.all(
+        patches.map((p) =>
+          fetch(`/api/meal-items/${p.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(p.body),
+          }),
+        ),
+      );
+      if (results.some((r) => !r.ok)) {
+        toast.error("일부 항목 수정 실패");
+      } else {
+        toast.success("수정됨");
+      }
+      exitMealEdit();
+      fetchToday();
+    } finally {
+      setSavingMeal(false);
+    }
   };
 
   useEffect(() => {
@@ -328,7 +391,8 @@ export default function Home() {
               .toString()
               .padStart(2, "0")}`;
             const mealName = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
-            const open = expandedId === m.id;
+            const isEditMode = editModeMealId === m.id;
+            const open = expandedId === m.id || isEditMode;
             const editing = editingId === m.id;
             return (
               <Card key={m.id} className="overflow-hidden py-0 gap-0">
@@ -383,6 +447,19 @@ export default function Home() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isEditMode) exitMealEdit();
+                        else enterMealEdit(m);
+                      }}
+                      aria-label="수정"
+                      className={`${isEditMode ? "text-green-600" : "text-neutral-300 hover:text-green-600"}`}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onDeleteMeal(m.id);
                       }}
                       aria-label="삭제"
@@ -392,7 +469,7 @@ export default function Home() {
                     </span>
                   </span>
                 </button>
-                {open && (
+                {open && !isEditMode && (
                   <div className="border-t px-4 py-3 flex flex-col gap-1 text-sm text-neutral-600">
                     {m.share_count > 1 && (
                       <div className="text-xs text-neutral-500 mb-1">{m.share_count}인 공유</div>
@@ -433,6 +510,79 @@ export default function Home() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                {isEditMode && (
+                  <div className="border-t bg-green-50/50 px-4 py-3 flex flex-col gap-3">
+                    {m.share_count > 1 && (
+                      <div className="text-xs text-neutral-500">{m.share_count}인 공유</div>
+                    )}
+                    <div className="grid grid-cols-[1fr_70px_80px] gap-2 text-[10px] text-neutral-500 font-medium px-1">
+                      <span>이름</span>
+                      <span className="text-right">그램</span>
+                      <span className="text-right">kcal</span>
+                    </div>
+                    {m.items.map((it) => {
+                      const draft = itemDrafts[it.id] ?? {
+                        name: it.name,
+                        grams: String(it.grams),
+                        kcal: String(it.kcal),
+                      };
+                      const setDraft = (patch: Partial<typeof draft>) =>
+                        setItemDrafts((prev) => ({ ...prev, [it.id]: { ...draft, ...patch } }));
+                      return (
+                        <div
+                          key={it.id}
+                          className="grid grid-cols-[1fr_70px_80px] gap-2 items-center"
+                        >
+                          <input
+                            type="text"
+                            value={draft.name}
+                            onChange={(e) => setDraft({ name: e.target.value })}
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-green-500"
+                          />
+                          <input
+                            type="number"
+                            value={draft.grams}
+                            onChange={(e) => setDraft({ grams: e.target.value })}
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-green-500"
+                          />
+                          <input
+                            type="number"
+                            value={draft.kcal}
+                            onChange={(e) => setDraft({ kcal: e.target.value })}
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-green-500"
+                          />
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={exitMealEdit}
+                        disabled={savingMeal}
+                      >
+                        <X className="w-4 h-4" />
+                        취소
+                      </Button>
+                      <Button
+                        type="button"
+                        className="flex-1"
+                        onClick={() => saveMealEdits(m)}
+                        disabled={savingMeal}
+                      >
+                        {savingMeal ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            저장
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </Card>
@@ -692,9 +842,6 @@ export default function Home() {
                             </div>
                           </details>
                         )}
-                        <div className="text-xs text-neutral-400">
-                          신뢰도 {(c.confidence * 100).toFixed(0)}%
-                        </div>
                       </CardContent>
                     </Card>
                   );

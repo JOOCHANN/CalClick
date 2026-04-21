@@ -5,6 +5,7 @@ import { supabaseServer } from "@/services/supabase-server";
 const PatchSchema = z.object({
   kcal: z.number().nonnegative().max(10000).optional(),
   grams: z.number().positive().max(5000).optional(),
+  name: z.string().trim().min(1).max(100).optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,9 +21,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  const payload: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.name) {
+    payload.food_id = null;
+    payload.source = "llm";
+  }
   const { data: updated, error } = await supabase
     .from("meal_items")
-    .update(parsed.data)
+    .update(payload)
     .eq("id", id)
     .select("meal_id")
     .single();
