@@ -15,10 +15,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     .delete()
     .eq("id", id)
     .eq("user_id", user.id)
-    .select("id");
+    .select("id, photo_path");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) {
     return NextResponse.json({ error: "not_found_or_forbidden" }, { status: 404 });
+  }
+  const photoPath = data[0].photo_path as string | null;
+  if (photoPath) {
+    await supabase.storage.from("meal-photos").remove([photoPath]);
   }
   return NextResponse.json({ ok: true });
 }
