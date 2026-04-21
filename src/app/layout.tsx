@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CalClick",
-  description: "한상차림 1장으로 칼로리 계산",
+  title: "CalClick — 한 번의 클릭, 오늘의 칼로리",
+  description: "한상차림 사진 한 장으로 오늘의 식단과 칼로리를 귀엽게 기록해요.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#16a34a",
+  themeColor: "#FF8A95",
 };
 
 export default function RootLayout({
@@ -39,7 +39,7 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-cream-50 text-ink-900">{children}</body>
     </html>
   );
 }

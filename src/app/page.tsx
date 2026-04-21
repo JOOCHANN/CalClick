@@ -9,7 +9,6 @@ import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { resizeImage } from "@/lib/image-resize";
-import { supabaseBrowser } from "@/services/supabase";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
 type EditableCandidate = FoodCandidate & { editedGrams: number };
@@ -355,30 +354,29 @@ export default function Home() {
 
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-6">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">CalClick</h1>
-        <div className="flex gap-3 text-xs text-neutral-500">
-          <Link href="/me" className="underline">통계</Link>
-          <Link href="/settings" className="underline">설정</Link>
-          <button
-            type="button"
-            onClick={async () => {
-              await supabaseBrowser().auth.signOut();
-              location.href = "/login";
-            }}
-            className="underline"
-          >
-            로그아웃
-          </button>
+      <header className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="CalClick" className="w-9 h-9 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)]" />
+          <div className="flex flex-col leading-tight">
+            <h1 className="text-lg font-bold tracking-tight">CalClick</h1>
+            <span className="text-[10px] text-ink-500">오늘도 예쁘게, 건강하게 🌿</span>
+          </div>
+        </div>
+        <div className="flex gap-1 text-xs">
+          <Link href="/me" className="px-3 py-1.5 rounded-full bg-white shadow-sm hover:shadow text-ink-700 active:scale-95 transition">통계</Link>
+          <Link href="/settings" className="px-3 py-1.5 rounded-full bg-white shadow-sm hover:shadow text-ink-700 active:scale-95 transition">설정</Link>
         </div>
       </header>
 
-      <section className="flex flex-col items-center py-4">
-        <span className="text-xs text-neutral-500">오늘 섭취 · {todayLabel}</span>
-        <span className="text-5xl font-semibold tabular-nums text-green-600">
+      <section className="relative flex flex-col items-center py-6 rounded-3xl bg-gradient-to-br from-brand-400 via-brand-500 to-brand-600 text-white shadow-[0_16px_40px_-12px_rgba(255,138,149,0.5)] overflow-hidden">
+        <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" aria-hidden />
+        <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" aria-hidden />
+        <span className="relative text-xs text-white/80">오늘 섭취 · {todayLabel}</span>
+        <span className="relative text-6xl font-extrabold tabular-nums tracking-tight mt-1">
           {todayKcal}
         </span>
-        <span className="text-xs text-neutral-500">kcal</span>
+        <span className="relative text-xs text-white/80 mt-0.5">kcal</span>
       </section>
 
       {todayMeals.length > 0 && (
@@ -402,7 +400,7 @@ export default function Home() {
                   className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-neutral-50"
                 >
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="inline-flex items-center rounded-full bg-green-50 text-green-700 text-xs px-2 py-0.5 shrink-0">
+                    <span className="inline-flex items-center rounded-full bg-brand-50 text-brand-700 text-xs px-2 py-0.5 shrink-0">
                       {mealName}
                     </span>
                     <span className="text-sm text-neutral-600 tabular-nums">{time}</span>
@@ -426,7 +424,7 @@ export default function Home() {
                             setEditingId(null);
                           }
                         }}
-                        className="w-20 text-right text-lg tabular-nums text-green-600 bg-transparent border-b border-green-600 outline-none"
+                        className="w-20 text-right text-lg tabular-nums text-brand-600 bg-transparent border-b border-brand-500 outline-none"
                       />
                     ) : (
                       <span
@@ -437,7 +435,7 @@ export default function Home() {
                           setEditingId(m.id);
                           setEditKcal(m.total_kcal.toString());
                         }}
-                        className="text-lg tabular-nums text-green-600 hover:underline"
+                        className="text-lg tabular-nums text-brand-600 hover:underline"
                       >
                         {m.total_kcal} kcal
                       </span>
@@ -451,7 +449,7 @@ export default function Home() {
                         else enterMealEdit(m);
                       }}
                       aria-label="수정"
-                      className={`${isEditMode ? "text-green-600" : "text-neutral-300 hover:text-green-600"}`}
+                      className={`${isEditMode ? "text-brand-600" : "text-neutral-300 hover:text-brand-600"}`}
                     >
                       <Pencil className="w-4 h-4" />
                     </span>
@@ -513,7 +511,7 @@ export default function Home() {
                   </div>
                 )}
                 {isEditMode && (
-                  <div className="border-t bg-green-50/50 px-4 py-3 flex flex-col gap-3">
+                  <div className="border-t bg-brand-50/50 px-4 py-3 flex flex-col gap-3">
                     {m.share_count > 1 && (
                       <div className="text-xs text-neutral-500">{m.share_count}인 공유</div>
                     )}
@@ -539,19 +537,19 @@ export default function Home() {
                             type="text"
                             value={draft.name}
                             onChange={(e) => setDraft({ name: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-green-500"
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-brand-500"
                           />
                           <input
                             type="number"
                             value={draft.grams}
                             onChange={(e) => setDraft({ grams: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-green-500"
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
                           />
                           <input
                             type="number"
                             value={draft.kcal}
                             onChange={(e) => setDraft({ kcal: e.target.value })}
-                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-green-500"
+                            className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm tabular-nums text-right outline-none focus:border-brand-500"
                           />
                         </div>
                       );
@@ -653,7 +651,7 @@ export default function Home() {
                     onClick={() => setMealType(mt)}
                     className={`px-3 h-9 rounded-full text-sm font-medium ${
                       mealType === mt
-                        ? "bg-green-600 text-white"
+                        ? "bg-brand-500 text-white"
                         : "bg-white border border-neutral-200 text-neutral-600"
                     }`}
                   >
@@ -672,7 +670,7 @@ export default function Home() {
                     onClick={() => setShareCount(n)}
                     className={`w-9 h-9 rounded-full text-sm font-medium tabular-nums ${
                       shareCount === n
-                        ? "bg-green-600 text-white"
+                        ? "bg-brand-500 text-white"
                         : "bg-white border border-neutral-200 text-neutral-600"
                     }`}
                   >
@@ -685,7 +683,7 @@ export default function Home() {
               <span className="text-sm text-neutral-600">
                 내 섭취 {shareCount > 1 && `(÷${shareCount})`}
               </span>
-              <span className="text-2xl font-semibold tabular-nums text-green-600">
+              <span className="text-2xl font-semibold tabular-nums text-brand-600">
                 {totalPreview} kcal
               </span>
             </div>
@@ -703,7 +701,7 @@ export default function Home() {
               groups.set(key, arr);
             });
             const palette = [
-              "bg-green-50 ring-green-100",
+              "bg-brand-50 ring-brand-100",
               "bg-amber-50 ring-amber-100",
               "bg-sky-50 ring-sky-100",
               "bg-rose-50 ring-rose-100",
@@ -729,7 +727,7 @@ export default function Home() {
                       <CardHeader>
                         <CardTitle className="flex justify-between items-baseline gap-2">
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600 shrink-0" />
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand-500 shrink-0" />
                             {(() => {
                               const nameKey = `${itIdx}-${it.selectedIdx}`;
                               const isEditing = editingNameKey === nameKey;
@@ -749,7 +747,7 @@ export default function Home() {
                                     if (e.key === "Enter") e.currentTarget.blur();
                                     else if (e.key === "Escape") setEditingNameKey(null);
                                   }}
-                                  className="min-w-0 flex-1 bg-transparent border-b border-green-600 outline-none"
+                                  className="min-w-0 flex-1 bg-transparent border-b border-brand-500 outline-none"
                                 />
                               ) : (
                                 <button
@@ -769,7 +767,7 @@ export default function Home() {
                               className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
                                 isLlm
                                   ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
+                                  : "bg-mint-100 text-mint-600"
                               }`}
                               title={isLlm ? "AI가 추정한 칼로리" : "식약처 DB에서 가져온 칼로리"}
                             >
@@ -777,7 +775,7 @@ export default function Home() {
                             </span>
                           </span>
                           <span className="flex items-center gap-3 shrink-0">
-                            <span className="text-lg tabular-nums text-green-600">
+                            <span className="text-lg tabular-nums text-brand-600">
                               {kcal} kcal
                             </span>
                             <button
@@ -825,7 +823,7 @@ export default function Home() {
                                         className={`text-[9px] px-1 py-0.5 rounded ${
                                           alt.source === "llm"
                                             ? "bg-amber-100 text-amber-700"
-                                            : "bg-emerald-100 text-emerald-700"
+                                            : "bg-mint-100 text-mint-600"
                                         }`}
                                       >
                                         {alt.source === "llm" ? "AI" : "DB"}

@@ -53,10 +53,10 @@ const MEAL_LABELS: Record<MealType, string> = {
   snack: "간식",
 };
 const MEAL_COLORS: Record<MealType, string> = {
-  breakfast: "bg-amber-100 text-amber-700",
-  lunch: "bg-emerald-100 text-emerald-700",
-  dinner: "bg-indigo-100 text-indigo-700",
-  snack: "bg-pink-100 text-pink-700",
+  breakfast: "bg-cream-100 text-amber-700",
+  lunch: "bg-mint-100 text-mint-600",
+  dinner: "bg-[#EEE6FF] text-[#6B4FCF]",
+  snack: "bg-brand-100 text-brand-700",
 };
 
 function formatMonthKey(d: Date): string {
@@ -153,15 +153,24 @@ export default function MePage() {
 
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-5">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">마이페이지</h1>
-        <Link href="/" className="text-xs text-neutral-500 underline">
-          홈
+      <header className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="CalClick" className="w-8 h-8 rounded-xl shadow-[0_4px_12px_rgba(255,138,149,0.3)]" />
+          <h1 className="text-xl font-bold tracking-tight">마이</h1>
+        </div>
+        <Link
+          href="/"
+          className="text-xs text-ink-500 bg-white px-3 py-1.5 rounded-full shadow-sm hover:shadow active:scale-95 transition"
+        >
+          홈으로
         </Link>
       </header>
 
       {/* 월 요약 카드 */}
-      <section className="rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 text-white p-5 shadow-sm">
+      <section className="relative rounded-3xl bg-gradient-to-br from-brand-400 to-brand-600 text-white p-5 shadow-[0_12px_32px_-8px_rgba(255,138,149,0.45)] overflow-hidden">
+        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-xl" aria-hidden />
+        <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl" aria-hidden />
         <div className="flex items-center justify-between mb-3">
           <button
             type="button"
@@ -204,10 +213,10 @@ export default function MePage() {
       </section>
 
       {/* 달력 */}
-      <section className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-100 p-3 flex flex-col gap-2">
+      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-2">
         <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center pb-1">
           {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-            <span key={d} className={i === 0 ? "text-rose-400" : i === 6 ? "text-sky-400" : ""}>
+            <span key={d} className={i === 0 ? "text-brand-400" : i === 6 ? "text-mint-600" : ""}>
               {d}
             </span>
           ))}
@@ -220,12 +229,12 @@ export default function MePage() {
             const intensity = d.total_kcal / maxKcal;
             const has = d.total_kcal > 0;
             const bg = !has
-              ? "bg-neutral-50 text-neutral-400"
+              ? "bg-cream-50 text-ink-500"
               : intensity < 0.33
-                ? "bg-green-100 text-green-900"
+                ? "bg-brand-100 text-brand-700"
                 : intensity < 0.66
-                  ? "bg-green-300 text-green-950"
-                  : "bg-green-600 text-white";
+                  ? "bg-brand-300 text-white"
+                  : "bg-brand-500 text-white";
             const isToday = d.date === todayKey;
             const isSelected = d.date === selectedDate;
             const day = Number(d.date.slice(-2));
@@ -234,12 +243,12 @@ export default function MePage() {
                 key={d.date}
                 type="button"
                 onClick={() => handleSelect(d.date)}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center transition ${bg} ${
+                className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition ${bg} ${
                   isSelected
-                    ? "ring-2 ring-green-700 scale-105 shadow"
+                    ? "ring-2 ring-brand-600 scale-105 shadow-md"
                     : isToday
-                      ? "ring-1 ring-green-700"
-                      : "hover:ring-1 hover:ring-green-400"
+                      ? "ring-1 ring-brand-500"
+                      : "hover:ring-1 hover:ring-brand-200"
                 }`}
               >
                 <span className="text-[11px] font-medium tabular-nums leading-none">{day}</span>
@@ -259,7 +268,7 @@ export default function MePage() {
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-semibold">{formatDayLabel(selectedDate)}</h2>
-            <span className="text-sm text-green-600 font-semibold tabular-nums flex items-center gap-1">
+            <span className="text-sm text-brand-600 font-bold tabular-nums flex items-center gap-1 bg-brand-50 px-3 py-1 rounded-full">
               <Flame className="w-3.5 h-3.5" />
               {dayDetail?.total_kcal ?? 0} kcal
             </span>
@@ -284,8 +293,8 @@ export default function MePage() {
                 const mealColor = m.meal_type ? MEAL_COLORS[m.meal_type] : "bg-neutral-100 text-neutral-600";
                 return (
                   <div key={m.id} className="relative">
-                    <span className="absolute -left-[18px] top-2 w-3 h-3 rounded-full bg-green-500 ring-4 ring-white" />
-                    <div className="rounded-xl bg-white ring-1 ring-neutral-100 shadow-sm p-3 flex flex-col gap-2">
+                    <span className="absolute -left-[18px] top-3 w-3 h-3 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 ring-4 ring-cream-50 shadow-[0_0_0_1px_rgba(255,138,149,0.2)]" />
+                    <div className="rounded-2xl bg-white ring-1 ring-brand-100/50 shadow-[0_4px_16px_-8px_rgba(255,138,149,0.25)] p-4 flex flex-col gap-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={`text-[10px] px-2 py-0.5 rounded-full ${mealColor}`}>
@@ -298,7 +307,7 @@ export default function MePage() {
                             </span>
                           )}
                         </div>
-                        <span className="text-sm font-semibold text-green-600 tabular-nums shrink-0">
+                        <span className="text-sm font-bold text-brand-600 tabular-nums shrink-0">
                           {m.total_kcal} kcal
                         </span>
                       </div>
@@ -326,8 +335,8 @@ export default function MePage() {
                                         [detailKey]: !prev[detailKey],
                                       }))
                                     }
-                                    className={`shrink-0 p-0.5 rounded hover:bg-neutral-100 ${
-                                      isOpen ? "text-green-600" : "text-neutral-400"
+                                    className={`shrink-0 p-0.5 rounded hover:bg-brand-50 ${
+                                      isOpen ? "text-brand-600" : "text-ink-500"
                                     }`}
                                     aria-label="상세정보"
                                     title="상세정보"
