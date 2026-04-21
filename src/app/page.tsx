@@ -84,6 +84,9 @@ export default function Home() {
   const [mealType, setMealType] = useState<MealType>(() => guessMealType());
   const [todayKcal, setTodayKcal] = useState<number>(0);
   const [todayMeals, setTodayMeals] = useState<TodayMeal[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editKcal, setEditKcal] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const todayLabel = formatToday();
 
@@ -106,6 +109,24 @@ export default function Home() {
       return;
     }
     toast.success("삭제됨");
+    fetchToday();
+  };
+
+  const saveEdit = async (id: string) => {
+    const n = Math.round(Number(editKcal));
+    setEditingId(null);
+    if (!Number.isFinite(n) || n < 0) return;
+    const current = todayMeals.find((m) => m.id === id);
+    if (!current || current.total_kcal === n) return;
+    const res = await fetch(`/api/meals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ total_kcal: n }),
+    });
+    if (!res.ok) {
+      toast.error("수정 실패");
+      return;
+    }
     fetchToday();
   };
 
@@ -280,45 +301,88 @@ export default function Home() {
               .toString()
               .padStart(2, "0")}`;
             const mealName = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
+            const open = expandedId === m.id;
+            const editing = editingId === m.id;
             return (
-              <Card key={m.id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex justify-between items-baseline gap-2 text-base">
-                    <span className="flex items-center gap-2">
-                      <span className="inline-flex items-center rounded-full bg-green-50 text-green-700 text-xs px-2 py-0.5">
-                        {mealName}
-                      </span>
-                      <span className="text-xs text-neutral-500 tabular-nums">{time}</span>
-                      {m.share_count > 1 && (
-                        <span className="text-xs text-neutral-500">÷{m.share_count}</span>
-                      )}
+              <Card key={m.id} className="overflow-hidden py-0 gap-0">
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(open ? null : m.id)}
+                  className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-neutral-50"
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex items-center rounded-full bg-green-50 text-green-700 text-xs px-2 py-0.5 shrink-0">
+                      {mealName}
                     </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-lg tabular-nums text-green-600">
+                    <span className="text-sm text-neutral-600 tabular-nums">{time}</span>
+                    <span className="text-xs text-neutral-400 truncate">
+                      {m.items.map((it) => it.name).join(", ")}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    {editing ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        value={editKcal}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEditKcal(e.target.value)}
+                        onBlur={() => saveEdit(m.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.currentTarget.blur();
+                          } else if (e.key === "Escape") {
+                            setEditingId(null);
+                          }
+                        }}
+                        className="w-20 text-right text-lg tabular-nums text-green-600 bg-transparent border-b border-green-600 outline-none"
+                      />
+                    ) : (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(m.id);
+                          setEditKcal(m.total_kcal.toString());
+                        }}
+                        className="text-lg tabular-nums text-green-600 hover:underline"
+                      >
                         {m.total_kcal} kcal
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteMeal(m.id)}
-                        aria-label="삭제"
-                        className="text-neutral-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    )}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteMeal(m.id);
+                      }}
+                      aria-label="삭제"
+                      className="text-neutral-300 hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-1 text-sm text-neutral-600">
-                  {m.items.map((it, i) => (
-                    <div key={i} className="flex justify-between">
-                      <span>
-                        {it.name}{" "}
-                        <span className="text-neutral-400 text-xs">{it.grams}g</span>
-                      </span>
-                      <span className="tabular-nums text-neutral-500">{it.kcal} kcal</span>
-                    </div>
-                  ))}
-                </CardContent>
+                  </span>
+                </button>
+                {open && (
+                  <div className="border-t px-4 py-3 flex flex-col gap-1 text-sm text-neutral-600">
+                    {m.share_count > 1 && (
+                      <div className="text-xs text-neutral-500 mb-1">
+                        {m.share_count}인 공유 · 내 몫만 기록됨
+                      </div>
+                    )}
+                    {m.items.map((it, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span>
+                          {it.name}{" "}
+                          <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                        </span>
+                        <span className="tabular-nums text-neutral-500">{it.kcal} kcal</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Card>
             );
           })}
