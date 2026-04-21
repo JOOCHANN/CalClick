@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
-import Link from "next/link";
 import { resizeImage } from "@/lib/image-resize";
+import { foodEmoji } from "@/lib/food-emoji";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
 type EditableCandidate = FoodCandidate & { editedGrams: number };
@@ -76,6 +76,9 @@ export default function Home() {
   const [shareCount, setShareCount] = useState<number>(1);
   const [mealType, setMealType] = useState<MealType>(() => guessMealType());
   const [todayKcal, setTodayKcal] = useState<number>(0);
+  const [goalKcal, setGoalKcal] = useState<number>(2000);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
   const [todayMeals, setTodayMeals] = useState<TodayMeal[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -209,6 +212,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchToday();
   }, [fetchToday]);
+
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("goal_kcal"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (Number.isFinite(saved) && saved > 0) setGoalKcal(saved);
+  }, []);
+
+  const saveGoal = () => {
+    const n = Math.round(Number(goalDraft));
+    setEditingGoal(false);
+    if (!Number.isFinite(n) || n < 500 || n > 6000) return;
+    setGoalKcal(n);
+    localStorage.setItem("goal_kcal", String(n));
+  };
 
   const rawTotal = items
     ? items
@@ -363,20 +380,76 @@ export default function Home() {
             <span className="text-[10px] text-ink-500">오늘도 예쁘게, 건강하게 🌿</span>
           </div>
         </div>
-        <div className="flex gap-1 text-xs">
-          <Link href="/me" className="px-3 py-1.5 rounded-full bg-white shadow-sm hover:shadow text-ink-700 active:scale-95 transition">통계</Link>
-          <Link href="/settings" className="px-3 py-1.5 rounded-full bg-white shadow-sm hover:shadow text-ink-700 active:scale-95 transition">설정</Link>
-        </div>
       </header>
 
       <section className="relative flex flex-col items-center py-6 rounded-3xl bg-gradient-to-br from-brand-400 via-brand-500 to-brand-600 text-white shadow-[0_16px_40px_-12px_rgba(255,138,149,0.5)] overflow-hidden">
         <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" aria-hidden />
         <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" aria-hidden />
         <span className="relative text-xs text-white/80">오늘 섭취 · {todayLabel}</span>
-        <span className="relative text-6xl font-extrabold tabular-nums tracking-tight mt-1">
-          {todayKcal}
-        </span>
-        <span className="relative text-xs text-white/80 mt-0.5">kcal</span>
+        {(() => {
+          const ratio = Math.min(1, todayKcal / Math.max(1, goalKcal));
+          const radius = 72;
+          const circumference = 2 * Math.PI * radius;
+          const offset = circumference * (1 - ratio);
+          const over = todayKcal > goalKcal;
+          return (
+            <div className="relative my-3 w-44 h-44">
+              <svg className="w-44 h-44 -rotate-90" viewBox="0 0 160 160">
+                <circle cx="80" cy="80" r={radius} stroke="rgba(255,255,255,0.2)" strokeWidth="10" fill="none" />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={radius}
+                  stroke="white"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  style={{ transition: "stroke-dashoffset 0.6s ease" }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-4xl font-extrabold tabular-nums tracking-tight leading-none">
+                  {todayKcal}
+                </span>
+                <span className="text-[10px] text-white/80 mt-1">/ {goalKcal} kcal</span>
+                <span className="text-[10px] text-white/90 mt-0.5 font-medium">
+                  {over ? "목표 초과 🫣" : `${Math.round(ratio * 100)}%`}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+        {editingGoal ? (
+          <div className="relative flex items-center gap-1">
+            <input
+              type="number"
+              autoFocus
+              value={goalDraft}
+              onChange={(e) => setGoalDraft(e.target.value)}
+              onBlur={saveGoal}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                else if (e.key === "Escape") setEditingGoal(false);
+              }}
+              className="w-20 text-center bg-white/20 rounded-full text-xs py-1 outline-none placeholder:text-white/60"
+              placeholder="목표"
+            />
+            <span className="text-[10px] text-white/80">kcal</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setGoalDraft(String(goalKcal));
+              setEditingGoal(true);
+            }}
+            className="relative text-[10px] text-white/80 hover:text-white underline underline-offset-2"
+          >
+            목표 kcal 수정
+          </button>
+        )}
       </section>
 
       {todayMeals.length > 0 && (
@@ -476,9 +549,14 @@ export default function Home() {
                       const itemEditing = editingItemId === it.id;
                       return (
                         <div key={it.id} className="flex justify-between items-center">
-                          <span>
-                            {it.name}{" "}
-                            <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+                              {foodEmoji(it.name)}
+                            </span>
+                            <span>
+                              {it.name}{" "}
+                              <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                            </span>
                           </span>
                           {itemEditing ? (
                             <input

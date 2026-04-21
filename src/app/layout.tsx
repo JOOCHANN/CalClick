@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { TabBarGate } from "@/components/TabBarGate";
 
 export const metadata: Metadata = {
   title: "CalClick — 한 번의 클릭, 오늘의 칼로리",
@@ -39,7 +40,10 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-cream-50 text-ink-900">{children}</body>
+      <body className="min-h-full flex flex-col bg-cream-50 text-ink-900 pb-20">
+        {children}
+        <TabBarGate />
+      </body>
     </html>
   );
 }

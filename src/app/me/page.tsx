@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,6 +11,7 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
+import { foodEmoji } from "@/lib/food-emoji";
 
 type Day = { date: string; total_kcal: number };
 type Stats = {
@@ -147,6 +147,19 @@ export default function MePage() {
   const maxKcal = Math.max(1, ...(stats?.days.map((d) => d.total_kcal) ?? [1]));
   const firstDow = stats?.days[0] ? dayOfWeek(stats.days[0].date) : 0;
 
+  const streak = (() => {
+    if (!stats) return 0;
+    const todayIdx = stats.days.findIndex((d) => d.date === todayKey);
+    if (todayIdx < 0) return 0;
+    let count = 0;
+    for (let i = todayIdx; i >= 0; i--) {
+      if (stats.days[i].total_kcal > 0) count++;
+      else if (i !== todayIdx) break;
+      else continue;
+    }
+    return count;
+  })();
+
   const handleSelect = (date: string) => {
     setSelectedDate((prev) => (prev === date ? null : date));
   };
@@ -159,12 +172,11 @@ export default function MePage() {
           <img src="/logo.svg" alt="CalClick" className="w-8 h-8 rounded-xl shadow-[0_4px_12px_rgba(255,138,149,0.3)]" />
           <h1 className="text-xl font-bold tracking-tight">마이</h1>
         </div>
-        <Link
-          href="/"
-          className="text-xs text-ink-500 bg-white px-3 py-1.5 rounded-full shadow-sm hover:shadow active:scale-95 transition"
-        >
-          홈으로
-        </Link>
+        {streak > 0 && (
+          <span className="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1 ring-1 ring-brand-100">
+            🔥 {streak}일째
+          </span>
+        )}
       </header>
 
       {/* 월 요약 카드 */}
@@ -321,6 +333,9 @@ export default function MePage() {
                             <li key={it.id} className="flex flex-col gap-1">
                               <div className="flex justify-between items-center text-sm text-neutral-600 gap-2">
                                 <span className="truncate flex items-center gap-1.5 min-w-0">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+                                    {foodEmoji(it.name)}
+                                  </span>
                                   <span className="truncate">
                                     {it.name}{" "}
                                     <span className="text-neutral-400 text-xs tabular-nums">
