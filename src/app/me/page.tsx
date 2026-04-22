@@ -119,7 +119,7 @@ export default function MePage() {
   const todayKey = toDateKey(today);
 
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [calendarView, setCalendarView] = useState<"month" | "week">("month");
+  const [calendarView, setCalendarView] = useState<"month" | "week" | "graph">("month");
   const [weekStart, setWeekStart] = useState<Date>(() => weekStartOf(todayKey));
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
@@ -429,63 +429,7 @@ export default function MePage() {
         </div>
       </section>
 
-      {/* 월간 추세 */}
-      {monthly && monthly.months.some((m) => m.avg_kcal > 0) && (
-        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold text-ink-500">월별 일 평균</h2>
-            {profile?.goal_kcal && (
-              <span className="text-[10px] text-ink-500">
-                목표 {profile.goal_kcal} kcal
-              </span>
-            )}
-          </div>
-          {(() => {
-            const goal = profile?.goal_kcal ?? 0;
-            const maxVal = Math.max(goal, ...monthly.months.map((m) => m.avg_kcal), 1);
-            return (
-              <div className="flex items-end justify-between gap-2 h-20 relative">
-                {goal > 0 && (
-                  <span
-                    className="absolute left-0 right-0 border-t border-dashed border-brand-300/70"
-                    style={{ bottom: `${(goal / maxVal) * 100}%` }}
-                    aria-hidden
-                  />
-                )}
-                {monthly.months.map((m) => {
-                  const pct = m.avg_kcal === 0 ? 0 : (m.avg_kcal / maxVal) * 100;
-                  const over = goal > 0 && m.avg_kcal > goal;
-                  const [, mm] = m.month.split("-");
-                  return (
-                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] tabular-nums text-ink-500 h-3">
-                        {m.avg_kcal > 0 ? m.avg_kcal : ""}
-                      </span>
-                      <div className="w-full flex-1 flex items-end">
-                        <div
-                          className={`w-full rounded-t-lg transition ${
-                            m.avg_kcal === 0
-                              ? "bg-cream-100"
-                              : over
-                                ? "bg-gradient-to-t from-brand-600 to-brand-400"
-                                : "bg-mint-300"
-                          }`}
-                          style={{ height: `${Math.max(m.avg_kcal === 0 ? 6 : 12, pct)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] font-medium text-ink-500 tabular-nums">
-                        {Number(mm)}월
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </section>
-      )}
-
-      {/* 달력 (주/월 토글) */}
+      {/* 달력 (월/주/그래프 토글) */}
       <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-xs">
@@ -513,6 +457,17 @@ export default function MePage() {
               }`}
             >
               주
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalendarView("graph")}
+              className={`px-3 py-1 rounded-full transition ${
+                calendarView === "graph"
+                  ? "bg-brand-500 text-white font-bold shadow-sm"
+                  : "text-ink-500"
+              }`}
+            >
+              그래프
             </button>
           </div>
           {calendarView === "week" && (
@@ -552,13 +507,15 @@ export default function MePage() {
           )}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center">
-          {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-            <span key={d} className={i === 0 ? "text-brand-400" : i === 6 ? "text-mint-600" : ""}>
-              {d}
-            </span>
-          ))}
-        </div>
+        {calendarView !== "graph" && (
+          <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
+              <span key={d} className={i === 0 ? "text-brand-400" : i === 6 ? "text-mint-600" : ""}>
+                {d}
+              </span>
+            ))}
+          </div>
+        )}
 
         {calendarView === "month" ? (
           <div className="grid grid-cols-7 gap-1">
@@ -591,7 +548,7 @@ export default function MePage() {
                   key={d.date}
                   type="button"
                   onClick={() => handleSelect(d.date)}
-                  className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition ${bg} ${
+                  className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center gap-0.5 transition ${bg} ${
                     isSelected
                       ? "ring-2 ring-brand-600 scale-105 shadow-md"
                       : isToday
@@ -599,23 +556,28 @@ export default function MePage() {
                         : "hover:ring-1 hover:ring-brand-200"
                   }`}
                 >
-                  <span className="text-[11px] font-medium tabular-nums leading-none">{day}</span>
-                  {has && (
-                    <span className="text-[9px] tabular-nums leading-none mt-0.5 opacity-90">
-                      {d.total_kcal}
+                  <span className="absolute top-1 left-1.5 text-[8px] tabular-nums opacity-55 leading-none">
+                    {day}
+                  </span>
+                  {has ? (
+                    <span className="flex items-baseline gap-0.5 leading-none">
+                      <span className="text-[11px] font-bold tabular-nums">{d.total_kcal}</span>
+                      <span className="text-[7px] opacity-70">kcal</span>
                     </span>
+                  ) : (
+                    <span className="text-[9px] opacity-30 leading-none">–</span>
                   )}
                   {w != null && (
-                    <span className="text-[8px] tabular-nums leading-none mt-0.5 opacity-75 flex items-center gap-0.5">
-                      <Scale className="w-2 h-2" />
-                      {w}
+                    <span className="flex items-baseline gap-0.5 leading-none">
+                      <span className="text-[9px] tabular-nums opacity-85">{w}</span>
+                      <span className="text-[7px] opacity-60">kg</span>
                     </span>
                   )}
                 </button>
               );
             })}
           </div>
-        ) : (
+        ) : calendarView === "week" ? (
           <div className="grid grid-cols-7 gap-1">
             {weekDays.map((d) => {
               const weekMax = Math.max(1, ...weekDays.map((x) => x.total_kcal));
@@ -645,7 +607,7 @@ export default function MePage() {
                     }
                     handleSelect(d.date);
                   }}
-                  className={`aspect-[3/4] rounded-2xl flex flex-col items-center justify-center gap-1 transition ${bg} ${
+                  className={`relative aspect-[3/4] rounded-2xl flex flex-col items-center justify-center gap-1 transition ${bg} ${
                     isFuture ? "opacity-30" : ""
                   } ${
                     isSelected
@@ -655,22 +617,190 @@ export default function MePage() {
                         : "hover:ring-1 hover:ring-brand-200"
                   }`}
                 >
-                  <span className="text-[10px] opacity-70 leading-none tabular-nums">
+                  <span className="absolute top-1 left-1.5 text-[9px] opacity-55 leading-none tabular-nums">
                     {Number(mm)}/{Number(dd)}
                   </span>
-                  <span className="text-xs font-bold tabular-nums leading-none">
-                    {has ? d.total_kcal : "–"}
-                  </span>
+                  {has ? (
+                    <span className="flex items-baseline gap-0.5 leading-none mt-1">
+                      <span className="text-sm font-bold tabular-nums">{d.total_kcal}</span>
+                      <span className="text-[8px] opacity-70">kcal</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] opacity-30 leading-none mt-1">–</span>
+                  )}
                   {w != null && (
-                    <span className="text-[9px] tabular-nums leading-none opacity-80 flex items-center gap-0.5">
-                      <Scale className="w-2 h-2" />
-                      {w}
+                    <span className="flex items-baseline gap-0.5 leading-none">
+                      <span className="text-[10px] tabular-nums opacity-85">{w}</span>
+                      <span className="text-[8px] opacity-60">kg</span>
                     </span>
                   )}
                 </button>
               );
             })}
           </div>
+        ) : (
+          (() => {
+            const months = monthly?.months ?? [];
+            const monthlyWeight = new Map<string, number>();
+            for (const m of months) {
+              const [y, mm] = m.month.split("-").map(Number);
+              const start = new Date(y, mm - 1, 1);
+              const end = new Date(y, mm, 0);
+              const inMonth = weightLogs.filter(
+                (l) => l.logged_on >= toDateKey(start) && l.logged_on <= toDateKey(end),
+              );
+              if (inMonth.length > 0) {
+                const avg = inMonth.reduce((s, x) => s + x.weight_kg, 0) / inMonth.length;
+                monthlyWeight.set(m.month, Math.round(avg * 10) / 10);
+              }
+            }
+            const hasAnyKcal = months.some((m) => m.avg_kcal > 0);
+            const hasAnyWeight = monthlyWeight.size > 0;
+            if (!hasAnyKcal && !hasAnyWeight) {
+              return (
+                <p className="text-center text-xs text-ink-500 py-10">
+                  아직 기록이 쌓이면 여기에 그래프가 나타나요 📈
+                </p>
+              );
+            }
+            const goal = profile?.goal_kcal ?? 0;
+            const kcalMax = Math.max(goal, ...months.map((m) => m.avg_kcal), 1);
+            const weightVals = Array.from(monthlyWeight.values());
+            const wMin = weightVals.length > 0 ? Math.min(...weightVals) : 0;
+            const wMax = weightVals.length > 0 ? Math.max(...weightVals) : 1;
+            const wRange = Math.max(0.5, wMax - wMin);
+            const chartH = 140;
+            const w = 300;
+            const padL = 4;
+            const padR = 4;
+            const bw = (w - padL - padR) / months.length;
+            const wxy = months
+              .map((m, i) => {
+                const v = monthlyWeight.get(m.month);
+                if (v == null) return null;
+                const x = padL + bw * (i + 0.5);
+                const y = chartH - ((v - wMin) / wRange) * (chartH - 20) - 10;
+                return { x, y, v, month: m.month };
+              })
+              .filter((p): p is { x: number; y: number; v: number; month: string } => p !== null);
+            const linePts = wxy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+            return (
+              <div className="flex flex-col gap-3 pt-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-ink-500">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-brand-600 to-brand-400" />
+                    칼로리 (일 평균)
+                  </span>
+                  <span className="flex items-center gap-1.5 text-ink-500">
+                    <span className="w-3 h-0.5 bg-mint-600" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-mint-600 -ml-1" />
+                    체중 (월 평균)
+                  </span>
+                </div>
+                <div className="relative">
+                  <svg
+                    viewBox={`0 0 ${w} ${chartH}`}
+                    className="w-full h-36"
+                    preserveAspectRatio="none"
+                  >
+                    {goal > 0 && (
+                      <line
+                        x1={0}
+                        x2={w}
+                        y1={chartH - (goal / kcalMax) * chartH}
+                        y2={chartH - (goal / kcalMax) * chartH}
+                        stroke="#FFB8C0"
+                        strokeWidth="1"
+                        strokeDasharray="3 3"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {months.map((m, i) => {
+                      const h =
+                        m.avg_kcal === 0 ? 2 : Math.max(8, (m.avg_kcal / kcalMax) * chartH);
+                      const x = padL + bw * i + bw * 0.2;
+                      const bwInner = bw * 0.6;
+                      const y = chartH - h;
+                      const over = goal > 0 && m.avg_kcal > goal;
+                      return (
+                        <rect
+                          key={m.month}
+                          x={x}
+                          y={y}
+                          width={bwInner}
+                          height={h}
+                          rx={4}
+                          fill={
+                            m.avg_kcal === 0
+                              ? "#FFF5F2"
+                              : over
+                                ? "url(#barOver)"
+                                : "url(#barNorm)"
+                          }
+                        />
+                      );
+                    })}
+                    {linePts && (
+                      <polyline
+                        points={linePts}
+                        fill="none"
+                        stroke="#4CAF8A"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {wxy.map((p) => (
+                      <circle
+                        key={p.month}
+                        cx={p.x}
+                        cy={p.y}
+                        r={3}
+                        fill="#fff"
+                        stroke="#4CAF8A"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                    <defs>
+                      <linearGradient id="barNorm" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0" stopColor="#FFB8C0" />
+                        <stop offset="1" stopColor="#FFD1D8" />
+                      </linearGradient>
+                      <linearGradient id="barOver" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0" stopColor="#EE5363" />
+                        <stop offset="1" stopColor="#FF8A95" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <div className="flex justify-between text-[10px] text-ink-500 tabular-nums -mt-1">
+                  {months.map((m) => {
+                    const [, mm] = m.month.split("-");
+                    const kcal = m.avg_kcal > 0 ? m.avg_kcal : null;
+                    const wv = monthlyWeight.get(m.month);
+                    return (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5">
+                        <span className="font-medium text-ink-700">{Number(mm)}월</span>
+                        {kcal != null && (
+                          <span className="text-brand-600 font-bold">{kcal} kcal</span>
+                        )}
+                        {wv != null && (
+                          <span className="text-mint-600 font-bold">{wv} kg</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {goal > 0 && (
+                  <p className="text-[10px] text-ink-500 text-right -mt-1">
+                    목표 {goal} kcal · 점선 기준
+                  </p>
+                )}
+              </div>
+            );
+          })()
         )}
       </section>
 
