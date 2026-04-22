@@ -9,10 +9,7 @@ import {
   Calendar as CalendarIcon,
   Info,
   Loader2,
-  Share2,
   Pencil,
-  LayoutGrid,
-  Image as ImageIcon,
   Scale,
 } from "lucide-react";
 import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
@@ -20,12 +17,6 @@ import { motivationLine } from "@/lib/motivation";
 import type { GoalType } from "@/lib/calorie-targets";
 
 type Day = { date: string; total_kcal: number };
-type Weekly = {
-  days: Day[];
-  prev_days: Day[];
-  current_avg: number;
-  prev_avg: number;
-};
 type Monthly = {
   months: { month: string; avg_kcal: number; active_days: number }[];
 };
@@ -95,6 +86,11 @@ function formatMonthKey(d: Date): string {
 function formatMonthLabel(d: Date): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 }
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
 function dayOfWeek(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).getDay();
@@ -111,16 +107,21 @@ function dayRange(dateStr: string): { from: string; to: string } {
   const end = new Date(y, m - 1, d + 1);
   return { from: start.toISOString(), to: end.toISOString() };
 }
+function weekStartOf(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - dt.getDay());
+  return dt;
+}
 
 export default function MePage() {
   const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
-    today.getDate(),
-  ).padStart(2, "0")}`;
+  const todayKey = toDateKey(today);
 
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [calendarView, setCalendarView] = useState<"month" | "week">("month");
+  const [weekStart, setWeekStart] = useState<Date>(() => weekStartOf(todayKey));
   const [stats, setStats] = useState<Stats | null>(null);
-  const [weekly, setWeekly] = useState<Weekly | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -131,13 +132,6 @@ export default function MePage() {
   const [noteEditing, setNoteEditing] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
-  const [view, setView] = useState<"calendar" | "gallery">("calendar");
-  const [photos, setPhotos] = useState<
-    { meal_id: string; eaten_at: string; total_kcal: number; url: string }[]
-  >([]);
-  const [loadingPhotos, setLoadingPhotos] = useState(false);
-  const [photosFetchedAt, setPhotosFetchedAt] = useState(0);
-  const [photosRefreshKey, setPhotosRefreshKey] = useState(0);
   const [weightLogs, setWeightLogs] = useState<
     { logged_on: string; weight_kg: number }[]
   >([]);
@@ -146,6 +140,8 @@ export default function MePage() {
   const [weightEditing, setWeightEditing] = useState(false);
   const [monthly, setMonthly] = useState<Monthly | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+
+  const weightByDate = new Map(weightLogs.map((l) => [l.logged_on, l.weight_kg]));
 
   const loadPhoto = useCallback(async (mealId: string) => {
     setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
@@ -184,16 +180,8 @@ export default function MePage() {
     void loadStats();
   }, [loadStats]);
 
-  useEffect(() => {
-    void (async () => {
-      const res = await fetch(`/api/stats/weekly`);
-      if (!res.ok) return;
-      setWeekly(await res.json());
-    })();
-  }, []);
-
   const loadWeights = useCallback(async () => {
-    const res = await fetch("/api/weight?days=90");
+    const res = await fetch("/api/weight?days=180");
     if (!res.ok) return;
     const data = (await res.json()) as {
       logs: { logged_on: string; weight_kg: number }[];
@@ -204,7 +192,7 @@ export default function MePage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await fetch("/api/weight?days=90");
+      const res = await fetch("/api/weight?days=180");
       if (!res.ok) return;
       const data = (await res.json()) as {
         logs: { logged_on: string; weight_kg: number }[];
@@ -234,14 +222,10 @@ export default function MePage() {
     };
   }, []);
 
-  const todayWeight = weightLogs.find((l) => l.logged_on === todayKey)?.weight_kg ?? null;
-  const lastWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight_kg : null;
-  const weightDelta =
-    weightLogs.length >= 2
-      ? Number((weightLogs[weightLogs.length - 1].weight_kg - weightLogs[0].weight_kg).toFixed(1))
-      : null;
+  const selectedWeight = selectedDate ? weightByDate.get(selectedDate) ?? null : null;
 
   const saveWeight = async () => {
+    if (!selectedDate) return;
     const n = Number(weightInput);
     if (!Number.isFinite(n) || n < 20 || n > 400) return;
     setWeightSaving(true);
@@ -249,7 +233,7 @@ export default function MePage() {
       const res = await fetch("/api/weight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weight_kg: n }),
+        body: JSON.stringify({ weight_kg: n, logged_on: selectedDate }),
       });
       if (!res.ok) return;
       setWeightEditing(false);
@@ -261,41 +245,6 @@ export default function MePage() {
   };
 
   useEffect(() => {
-    if (view !== "gallery") return;
-    let cancelled = false;
-    void (async () => {
-      setLoadingPhotos(true);
-      try {
-        const res = await fetch(`/api/stats/photos?month=${formatMonthKey(cursor)}`);
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          photos: { meal_id: string; eaten_at: string; total_kcal: number; url: string }[];
-        };
-        if (!cancelled) {
-          setPhotos(data.photos);
-          setPhotosFetchedAt(Date.now());
-        }
-      } finally {
-        if (!cancelled) setLoadingPhotos(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [view, cursor, photosRefreshKey]);
-
-  useEffect(() => {
-    if (view !== "gallery") return;
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - photosFetchedAt < 8 * 60 * 1000) return;
-      setPhotosRefreshKey((k) => k + 1);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [view, photosFetchedAt]);
-
-  useEffect(() => {
     if (!selectedDate) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDayDetail(null);
@@ -303,6 +252,11 @@ export default function MePage() {
     }
     void loadDay(selectedDate);
   }, [selectedDate, loadDay]);
+
+  useEffect(() => {
+    setWeightEditing(false);
+    setWeightInput("");
+  }, [selectedDate]);
 
   useEffect(() => {
     if (!dayDetail) return;
@@ -339,124 +293,30 @@ export default function MePage() {
     return count;
   })();
 
-  const handleShare = useCallback(async () => {
-    if (!weekly) return;
-    const size = 1080;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const todayEntry = stats?.days.find((d) => d.date === todayKey);
+  const todayKcal = todayEntry?.total_kcal ?? 0;
+  const goalKcal = profile?.goal_kcal ?? null;
+  const remaining = goalKcal ? goalKcal - todayKcal : null;
+  const ratio = goalKcal ? todayKcal / goalKcal : null;
+  const nick = profile?.nickname?.trim() || "오늘";
+  const motiv = motivationLine({
+    goal: profile?.goal_type ?? null,
+    remaining,
+    ratio,
+    streak,
+  });
 
-    const grad = ctx.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, "#FF8A95");
-    grad.addColorStop(1, "#EE5363");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.beginPath();
-    ctx.arc(size - 120, 100, 180, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(80, size - 80, 160, 0, Math.PI * 2);
-    ctx.fill();
-
-    const font = `"Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif`;
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = `600 36px ${font}`;
-    ctx.textAlign = "left";
-    ctx.fillText("CalClick · 이번 주 식단", 80, 140);
-
-    ctx.fillStyle = "#fff";
-    ctx.font = `800 64px ${font}`;
-    const startDate = weekly.days[0]?.date ?? "";
-    const endDate = weekly.days[weekly.days.length - 1]?.date ?? "";
-    const fmt = (d: string) => {
-      const [, m, day] = d.split("-");
-      return `${Number(m)}.${Number(day)}`;
-    };
-    if (startDate && endDate) {
-      ctx.fillText(`${fmt(startDate)} - ${fmt(endDate)}`, 80, 220);
+  const weekDays: Day[] = (() => {
+    const result: Day[] = [];
+    const byDate = new Map(stats?.days.map((d) => [d.date, d.total_kcal]) ?? []);
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(weekStart);
+      dt.setDate(weekStart.getDate() + i);
+      const key = toDateKey(dt);
+      result.push({ date: key, total_kcal: byDate.get(key) ?? 0 });
     }
-
-    ctx.font = `500 32px ${font}`;
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.fillText("일 평균", 80, 320);
-    ctx.fillStyle = "#fff";
-    ctx.font = `900 160px ${font}`;
-    ctx.fillText(`${weekly.current_avg}`, 80, 470);
-    ctx.font = `500 40px ${font}`;
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText("kcal", 80 + ctx.measureText(`${weekly.current_avg}`).width + 16, 470);
-
-    if (weekly.prev_avg > 0) {
-      const delta = weekly.current_avg - weekly.prev_avg;
-      const sign = delta >= 0 ? "+" : "";
-      ctx.font = `600 28px ${font}`;
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.fillText(`지난주 대비 ${sign}${delta} kcal`, 80, 520);
-    }
-
-    const chartTop = 600;
-    const chartH = 280;
-    const chartW = size - 160;
-    const barGap = 16;
-    const barW = (chartW - barGap * 6) / 7;
-    const maxVal = Math.max(1, ...weekly.days.map((d) => d.total_kcal));
-    weekly.days.forEach((d, i) => {
-      const x = 80 + i * (barW + barGap);
-      const h = d.total_kcal === 0 ? 12 : (d.total_kcal / maxVal) * chartH;
-      const y = chartTop + chartH - h;
-      ctx.fillStyle = d.date === todayKey ? "#fff" : "rgba(255,255,255,0.55)";
-      const r = 14;
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + barW - r, y);
-      ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
-      ctx.lineTo(x + barW, chartTop + chartH);
-      ctx.lineTo(x, chartTop + chartH);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-      ctx.fill();
-
-      const dow = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(d.date)];
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = `600 24px ${font}`;
-      ctx.textAlign = "center";
-      ctx.fillText(dow, x + barW / 2, chartTop + chartH + 42);
-      ctx.textAlign = "left";
-    });
-
-    ctx.textAlign = "right";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = `500 28px ${font}`;
-    ctx.fillText("calclick.app", size - 80, size - 60);
-    ctx.textAlign = "left";
-
-    const blob: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/png"));
-    if (!blob) return;
-    const file = new File([blob], "calclick-week.png", { type: "image/png" });
-    const nav = navigator as Navigator & {
-      canShare?: (d: ShareData) => boolean;
-      share?: (d: ShareData) => Promise<void>;
-    };
-    if (nav.canShare?.({ files: [file] }) && nav.share) {
-      try {
-        await nav.share({ files: [file], title: "CalClick 이번 주" });
-        return;
-      } catch {
-        // fallthrough to download
-      }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "calclick-week.png";
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [weekly, todayKey]);
+    return result;
+  })();
 
   const saveNote = async (mealId: string) => {
     setNoteSaving(true);
@@ -489,50 +349,40 @@ export default function MePage() {
     setSelectedDate((prev) => (prev === date ? null : date));
   };
 
+  const weekRangeLabel = (() => {
+    const end = new Date(weekStart);
+    end.setDate(weekStart.getDate() + 6);
+    return `${weekStart.getMonth() + 1}.${weekStart.getDate()} – ${end.getMonth() + 1}.${end.getDate()}`;
+  })();
+
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-5 flex flex-col gap-4">
-      {(() => {
-        const todayEntry = weekly?.days.find((d) => d.date === todayKey);
-        const todayKcal = todayEntry?.total_kcal ?? 0;
-        const goal = profile?.goal_kcal ?? null;
-        const remaining = goal ? goal - todayKcal : null;
-        const ratio = goal ? todayKcal / goal : null;
-        const nick = profile?.nickname?.trim() || "오늘";
-        const motiv = motivationLine({
-          goal: profile?.goal_type ?? null,
-          remaining,
-          ratio,
-          streak,
-        });
-        return (
-          <header className="flex items-start justify-between gap-3 pt-1">
-            <div className="flex items-center gap-2.5 min-w-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo.svg"
-                alt="CalClick"
-                className="w-10 h-10 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)] shrink-0"
-              />
-              <div className="flex flex-col min-w-0">
-                <h1 className="text-xl font-black italic tracking-[-0.04em] leading-none truncate">
-                  <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent">
-                    {nick}
-                  </span>
-                  <span className="text-ink-900">님</span>
-                </h1>
-                <p className="text-[11px] text-ink-500 mt-1 leading-snug line-clamp-2">
-                  {motiv}
-                </p>
-              </div>
-            </div>
-            {streak > 0 && (
-              <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-brand-100 shrink-0">
-                🔥 {streak}일째
+      <header className="flex items-start justify-between gap-3 pt-1">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="CalClick"
+            className="w-10 h-10 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)] shrink-0"
+          />
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-xl font-black italic tracking-[-0.04em] leading-none truncate">
+              <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent">
+                {nick}
               </span>
-            )}
-          </header>
-        );
-      })()}
+              <span className="text-ink-900">님</span>
+            </h1>
+            <p className="text-[11px] text-ink-500 mt-1 leading-snug line-clamp-2">
+              {motiv}
+            </p>
+          </div>
+        </div>
+        {streak > 0 && (
+          <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-brand-100 shrink-0">
+            🔥 {streak}일째
+          </span>
+        )}
+      </header>
 
       {/* 월 요약 카드 */}
       <section className="relative rounded-3xl bg-gradient-to-br from-brand-400 to-brand-600 text-white p-4 shadow-[0_12px_32px_-8px_rgba(255,138,149,0.45)] overflow-hidden">
@@ -577,200 +427,6 @@ export default function MePage() {
             <div className="text-[9px] text-white/60">일</div>
           </div>
         </div>
-      </section>
-
-      {/* 주간 차트 */}
-      {weekly && (
-        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-semibold">이번 주</h2>
-              {weekly.prev_avg > 0 && weekly.current_avg > 0 && (
-                <span className="text-[11px] text-ink-500">
-                  지난주 대비{" "}
-                  <span
-                    className={
-                      weekly.current_avg >= weekly.prev_avg
-                        ? "text-brand-600 font-bold"
-                        : "text-mint-600 font-bold"
-                    }
-                  >
-                    {weekly.current_avg >= weekly.prev_avg ? "+" : ""}
-                    {weekly.current_avg - weekly.prev_avg} kcal
-                  </span>
-                </span>
-              )}
-            </div>
-            {weekly.current_avg > 0 && (
-              <button
-                type="button"
-                onClick={handleShare}
-                className="text-[11px] text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1 rounded-full bg-brand-50 ring-1 ring-brand-100"
-              >
-                <Share2 className="w-3 h-3" />
-                공유
-              </button>
-            )}
-          </div>
-          <div className="flex items-end justify-between gap-1.5 h-20">
-            {weekly.days.map((d, i) => {
-              const max = Math.max(1, ...weekly.days.map((x) => x.total_kcal));
-              const pct = (d.total_kcal / max) * 100;
-              const isToday = d.date === todayKey;
-              const dow = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(d.date)];
-              return (
-                <button
-                  key={d.date}
-                  type="button"
-                  onClick={() => {
-                    const [y, m] = d.date.split("-").map(Number);
-                    setCursor(new Date(y, m - 1, 1));
-                    setSelectedDate(d.date);
-                  }}
-                  className="flex-1 flex flex-col items-center gap-1 group"
-                >
-                  <span className="text-[9px] tabular-nums text-ink-500 h-3">
-                    {d.total_kcal > 0 ? d.total_kcal : ""}
-                  </span>
-                  <div className="w-full flex-1 flex items-end">
-                    <div
-                      className={`w-full rounded-t-lg transition group-hover:opacity-80 ${
-                        d.total_kcal === 0
-                          ? "bg-cream-100"
-                          : isToday
-                            ? "bg-gradient-to-t from-brand-600 to-brand-400"
-                            : "bg-brand-200"
-                      }`}
-                      style={{ height: `${Math.max(d.total_kcal === 0 ? 6 : 12, pct)}%` }}
-                    />
-                  </div>
-                  <span
-                    className={`text-[10px] font-medium ${
-                      isToday
-                        ? "text-brand-600"
-                        : i === 0 || dow === "일"
-                          ? "text-brand-400"
-                          : dow === "토"
-                            ? "text-mint-600"
-                            : "text-ink-500"
-                    }`}
-                  >
-                    {dow}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* 체중 카드 */}
-      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold flex items-center gap-1.5 text-ink-500">
-            <Scale className="w-3.5 h-3.5 text-brand-500" />
-            체중
-          </h2>
-          {weightDelta != null && weightLogs.length >= 2 && (
-            <span
-              className={`text-[11px] font-bold ${
-                weightDelta > 0
-                  ? "text-brand-600"
-                  : weightDelta < 0
-                    ? "text-mint-600"
-                    : "text-ink-500"
-              }`}
-            >
-              {weightDelta > 0 ? "+" : ""}
-              {weightDelta} kg · 90일
-            </span>
-          )}
-        </div>
-        {weightEditing ? (
-          <div className="flex gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              value={weightInput}
-              onChange={(e) => setWeightInput(e.target.value)}
-              placeholder={lastWeight ? String(lastWeight) : "예: 65.5"}
-              autoFocus
-              className="flex-1 px-3 py-2 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm tabular-nums"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setWeightEditing(false);
-                setWeightInput("");
-              }}
-              className="px-3 py-2 text-xs rounded-xl bg-cream-100 text-ink-500"
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={saveWeight}
-              disabled={weightSaving || !weightInput}
-              className="px-4 py-2 text-xs rounded-xl bg-brand-500 text-white font-bold disabled:opacity-50"
-            >
-              {weightSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "저장"}
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setWeightInput(todayWeight ? String(todayWeight) : lastWeight ? String(lastWeight) : "");
-              setWeightEditing(true);
-            }}
-            className="text-left flex items-center gap-3 active:scale-[0.98] transition"
-          >
-            <div className="flex items-baseline gap-1.5 shrink-0">
-              <span className="text-2xl font-black italic tabular-nums text-ink-900 leading-none">
-                {todayWeight ?? lastWeight ?? "—"}
-              </span>
-              <span className="text-xs text-ink-500">kg</span>
-            </div>
-            {weightLogs.length >= 2 &&
-              (() => {
-                const w = 200;
-                const h = 32;
-                const vals = weightLogs.map((l) => l.weight_kg);
-                const min = Math.min(...vals);
-                const max = Math.max(...vals);
-                const range = Math.max(0.5, max - min);
-                const pts = weightLogs
-                  .map((l, i) => {
-                    const x = (i / Math.max(1, weightLogs.length - 1)) * w;
-                    const y = h - ((l.weight_kg - min) / range) * h;
-                    return `${x.toFixed(1)},${y.toFixed(1)}`;
-                  })
-                  .join(" ");
-                return (
-                  <svg
-                    viewBox={`0 0 ${w} ${h}`}
-                    className="flex-1 h-8"
-                    preserveAspectRatio="none"
-                  >
-                    <polyline
-                      points={pts}
-                      fill="none"
-                      stroke="#FF8A95"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                );
-              })()}
-            {todayWeight == null && (
-              <span className="text-[11px] text-brand-600 font-medium ml-auto shrink-0">
-                기록하기 →
-              </span>
-            )}
-          </button>
-        )}
       </section>
 
       {/* 월간 추세 */}
@@ -829,135 +485,197 @@ export default function MePage() {
         </section>
       )}
 
-      {/* 뷰 토글 */}
-      <div className="flex bg-white rounded-full p-1 ring-1 ring-brand-100/50 shadow-sm text-xs">
-        <button
-          type="button"
-          onClick={() => setView("calendar")}
-          className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full transition ${
-            view === "calendar"
-              ? "bg-brand-500 text-white font-bold shadow-sm"
-              : "text-ink-500"
-          }`}
-        >
-          <LayoutGrid className="w-3.5 h-3.5" />
-          달력
-        </button>
-        <button
-          type="button"
-          onClick={() => setView("gallery")}
-          className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full transition ${
-            view === "gallery"
-              ? "bg-brand-500 text-white font-bold shadow-sm"
-              : "text-ink-500"
-          }`}
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-          사진
-        </button>
-      </div>
-
-      {view === "gallery" && (
-        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-3 flex flex-col gap-2">
-          {loadingPhotos ? (
-            <div className="grid grid-cols-3 gap-1.5">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <span key={i} className="aspect-square rounded-xl bg-cream-100 animate-pulse" />
-              ))}
-            </div>
-          ) : photos.length === 0 ? (
-            <p className="text-center text-xs text-ink-500 py-10">
-              이번 달엔 사진 기록이 없어요 📷
-            </p>
-          ) : (
-            <div className="grid grid-cols-3 gap-1.5">
-              {photos.map((p) => {
-                const d = new Date(p.eaten_at);
-                return (
-                  <button
-                    key={p.meal_id}
-                    type="button"
-                    onClick={() => setModalUrl(p.url)}
-                    className="relative aspect-square rounded-xl overflow-hidden ring-1 ring-brand-100/60 active:scale-[0.97] transition"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="식사" className="w-full h-full object-cover" loading="lazy" />
-                    <span className="absolute bottom-1 right-1 text-[9px] font-bold text-white bg-black/50 rounded-md px-1.5 py-0.5 tabular-nums">
-                      {p.total_kcal}
-                    </span>
-                    <span className="absolute top-1 left-1 text-[9px] text-white bg-black/40 rounded-md px-1.5 py-0.5 tabular-nums">
-                      {d.getMonth() + 1}.{d.getDate()}
-                    </span>
-                  </button>
-                );
-              })}
+      {/* 달력 (주/월 토글) */}
+      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-xs">
+            <button
+              type="button"
+              onClick={() => setCalendarView("month")}
+              className={`px-3 py-1 rounded-full transition ${
+                calendarView === "month"
+                  ? "bg-brand-500 text-white font-bold shadow-sm"
+                  : "text-ink-500"
+              }`}
+            >
+              월
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedDate) setWeekStart(weekStartOf(selectedDate));
+                setCalendarView("week");
+              }}
+              className={`px-3 py-1 rounded-full transition ${
+                calendarView === "week"
+                  ? "bg-brand-500 text-white font-bold shadow-sm"
+                  : "text-ink-500"
+              }`}
+            >
+              주
+            </button>
+          </div>
+          {calendarView === "week" && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const prev = new Date(weekStart);
+                  prev.setDate(weekStart.getDate() - 7);
+                  setWeekStart(prev);
+                }}
+                className="p-1 rounded-full text-ink-500 hover:bg-brand-50"
+                aria-label="이전 주"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs tabular-nums text-ink-700">{weekRangeLabel}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new Date(weekStart);
+                  next.setDate(weekStart.getDate() + 7);
+                  if (toDateKey(next) > todayKey) return;
+                  setWeekStart(next);
+                }}
+                disabled={(() => {
+                  const next = new Date(weekStart);
+                  next.setDate(weekStart.getDate() + 7);
+                  return toDateKey(next) > todayKey;
+                })()}
+                className="p-1 rounded-full text-ink-500 hover:bg-brand-50 disabled:opacity-30"
+                aria-label="다음 주"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           )}
-        </section>
-      )}
+        </div>
 
-      {/* 달력 */}
-      {view === "calendar" && (
-      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-2">
-        <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center pb-1">
+        <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center">
           {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
             <span key={d} className={i === 0 ? "text-brand-400" : i === 6 ? "text-mint-600" : ""}>
               {d}
             </span>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {!stats &&
-            Array.from({ length: 35 }).map((_, i) => (
-              <span
-                key={`sk-${i}`}
-                className="aspect-square rounded-2xl bg-cream-100 animate-pulse"
-              />
+
+        {calendarView === "month" ? (
+          <div className="grid grid-cols-7 gap-1">
+            {!stats &&
+              Array.from({ length: 35 }).map((_, i) => (
+                <span
+                  key={`sk-${i}`}
+                  className="aspect-square rounded-2xl bg-cream-100 animate-pulse"
+                />
+              ))}
+            {Array.from({ length: firstDow }).map((_, i) => (
+              <span key={`pad-${i}`} />
             ))}
-          {Array.from({ length: firstDow }).map((_, i) => (
-            <span key={`pad-${i}`} />
-          ))}
-          {stats?.days.map((d) => {
-            const intensity = d.total_kcal / maxKcal;
-            const has = d.total_kcal > 0;
-            const bg = !has
-              ? "bg-cream-50 text-ink-500"
-              : intensity < 0.33
-                ? "bg-brand-100 text-brand-700"
-                : intensity < 0.66
-                  ? "bg-brand-300 text-white"
-                  : "bg-brand-500 text-white";
-            const isToday = d.date === todayKey;
-            const isSelected = d.date === selectedDate;
-            const day = Number(d.date.slice(-2));
-            return (
-              <button
-                key={d.date}
-                type="button"
-                onClick={() => handleSelect(d.date)}
-                className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition ${bg} ${
-                  isSelected
-                    ? "ring-2 ring-brand-600 scale-105 shadow-md"
-                    : isToday
-                      ? "ring-1 ring-brand-500"
-                      : "hover:ring-1 hover:ring-brand-200"
-                }`}
-              >
-                <span className="text-[11px] font-medium tabular-nums leading-none">{day}</span>
-                {has && (
-                  <span className="text-[9px] tabular-nums leading-none mt-0.5 opacity-90">
-                    {d.total_kcal}
+            {stats?.days.map((d) => {
+              const intensity = d.total_kcal / maxKcal;
+              const has = d.total_kcal > 0;
+              const bg = !has
+                ? "bg-cream-50 text-ink-500"
+                : intensity < 0.33
+                  ? "bg-brand-100 text-brand-700"
+                  : intensity < 0.66
+                    ? "bg-brand-300 text-white"
+                    : "bg-brand-500 text-white";
+              const isToday = d.date === todayKey;
+              const isSelected = d.date === selectedDate;
+              const day = Number(d.date.slice(-2));
+              const w = weightByDate.get(d.date);
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  onClick={() => handleSelect(d.date)}
+                  className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition ${bg} ${
+                    isSelected
+                      ? "ring-2 ring-brand-600 scale-105 shadow-md"
+                      : isToday
+                        ? "ring-1 ring-brand-500"
+                        : "hover:ring-1 hover:ring-brand-200"
+                  }`}
+                >
+                  <span className="text-[11px] font-medium tabular-nums leading-none">{day}</span>
+                  {has && (
+                    <span className="text-[9px] tabular-nums leading-none mt-0.5 opacity-90">
+                      {d.total_kcal}
+                    </span>
+                  )}
+                  {w != null && (
+                    <span className="text-[8px] tabular-nums leading-none mt-0.5 opacity-75 flex items-center gap-0.5">
+                      <Scale className="w-2 h-2" />
+                      {w}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((d) => {
+              const weekMax = Math.max(1, ...weekDays.map((x) => x.total_kcal));
+              const intensity = d.total_kcal / weekMax;
+              const has = d.total_kcal > 0;
+              const bg = !has
+                ? "bg-cream-50 text-ink-500"
+                : intensity < 0.33
+                  ? "bg-brand-100 text-brand-700"
+                  : intensity < 0.66
+                    ? "bg-brand-300 text-white"
+                    : "bg-brand-500 text-white";
+              const isToday = d.date === todayKey;
+              const isSelected = d.date === selectedDate;
+              const w = weightByDate.get(d.date);
+              const [, mm, dd] = d.date.split("-");
+              const isFuture = d.date > todayKey;
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  disabled={isFuture}
+                  onClick={() => {
+                    const [y, m] = d.date.split("-").map(Number);
+                    if (m - 1 !== cursor.getMonth() || y !== cursor.getFullYear()) {
+                      setCursor(new Date(y, m - 1, 1));
+                    }
+                    handleSelect(d.date);
+                  }}
+                  className={`aspect-[3/4] rounded-2xl flex flex-col items-center justify-center gap-1 transition ${bg} ${
+                    isFuture ? "opacity-30" : ""
+                  } ${
+                    isSelected
+                      ? "ring-2 ring-brand-600 scale-[1.03] shadow-md"
+                      : isToday
+                        ? "ring-1 ring-brand-500"
+                        : "hover:ring-1 hover:ring-brand-200"
+                  }`}
+                >
+                  <span className="text-[10px] opacity-70 leading-none tabular-nums">
+                    {Number(mm)}/{Number(dd)}
                   </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  <span className="text-xs font-bold tabular-nums leading-none">
+                    {has ? d.total_kcal : "–"}
+                  </span>
+                  {w != null && (
+                    <span className="text-[9px] tabular-nums leading-none opacity-80 flex items-center gap-0.5">
+                      <Scale className="w-2 h-2" />
+                      {w}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
-      )}
 
       {/* 선택한 날 상세 */}
-      {view === "calendar" && selectedDate && (
+      {selectedDate && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
@@ -966,10 +684,11 @@ export default function MePage() {
                 onClick={() => {
                   const [y, m, d] = selectedDate.split("-").map(Number);
                   const prev = new Date(y, m - 1, d - 1);
-                  const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(prev.getDate()).padStart(2, "0")}`;
+                  const key = toDateKey(prev);
                   if (prev.getMonth() !== cursor.getMonth() || prev.getFullYear() !== cursor.getFullYear()) {
                     setCursor(new Date(prev.getFullYear(), prev.getMonth(), 1));
                   }
+                  if (calendarView === "week") setWeekStart(weekStartOf(key));
                   setSelectedDate(key);
                 }}
                 className="p-1 rounded-full text-ink-500 hover:bg-brand-50 hover:text-brand-600"
@@ -983,11 +702,12 @@ export default function MePage() {
                 onClick={() => {
                   const [y, m, d] = selectedDate.split("-").map(Number);
                   const next = new Date(y, m - 1, d + 1);
-                  const key = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+                  const key = toDateKey(next);
                   if (key > todayKey) return;
                   if (next.getMonth() !== cursor.getMonth() || next.getFullYear() !== cursor.getFullYear()) {
                     setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
                   }
+                  if (calendarView === "week") setWeekStart(weekStartOf(key));
                   setSelectedDate(key);
                 }}
                 disabled={selectedDate >= todayKey}
@@ -1001,6 +721,65 @@ export default function MePage() {
               <Flame className="w-3.5 h-3.5" />
               {dayDetail?.total_kcal ?? 0} kcal
             </span>
+          </div>
+
+          {/* 체중 로깅 */}
+          <div className="rounded-2xl bg-white ring-1 ring-brand-100/50 shadow-[0_4px_16px_-8px_rgba(255,138,149,0.2)] px-4 py-3 flex items-center gap-3">
+            <Scale className="w-4 h-4 text-brand-500 shrink-0" />
+            {weightEditing ? (
+              <>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={weightInput}
+                  onChange={(e) => setWeightInput(e.target.value)}
+                  placeholder={selectedWeight ? String(selectedWeight) : "예: 65.5"}
+                  autoFocus
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm tabular-nums"
+                />
+                <span className="text-xs text-ink-500">kg</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWeightEditing(false);
+                    setWeightInput("");
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-xl bg-cream-100 text-ink-500"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveWeight}
+                  disabled={weightSaving || !weightInput}
+                  className="px-3 py-1.5 text-xs rounded-xl bg-brand-500 text-white font-bold disabled:opacity-50"
+                >
+                  {weightSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "저장"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setWeightInput(selectedWeight ? String(selectedWeight) : "");
+                  setWeightEditing(true);
+                }}
+                className="flex-1 flex items-center justify-between text-left active:scale-[0.98] transition"
+              >
+                <span className="text-xs font-semibold text-ink-500">체중</span>
+                {selectedWeight != null ? (
+                  <span className="flex items-baseline gap-1">
+                    <span className="text-lg font-black italic tabular-nums text-ink-900 leading-none">
+                      {selectedWeight}
+                    </span>
+                    <span className="text-xs text-ink-500">kg</span>
+                    <Pencil className="w-3 h-3 text-ink-500 ml-1.5" />
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-brand-600 font-medium">기록하기 →</span>
+                )}
+              </button>
+            )}
           </div>
 
           {loadingDay ? (

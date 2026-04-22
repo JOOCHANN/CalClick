@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/services/supabase-server";
+import { supabaseAdmin } from "@/services/supabase-admin";
 import { computeTargets } from "@/lib/calorie-targets";
 
+const NICKNAME_RE = /^[가-힣A-Za-z0-9_.-]+$/;
+
 const PatchSchema = z.object({
-  nickname: z.string().trim().min(1).max(20).nullable().optional(),
+  nickname: z
+    .string()
+    .trim()
+    .min(2)
+    .max(20)
+    .regex(NICKNAME_RE)
+    .nullable()
+    .optional(),
   sex: z.enum(["male", "female"]).nullable().optional(),
   birth_year: z.number().int().min(1900).max(2100).nullable().optional(),
   height_cm: z.number().min(50).max(250).nullable().optional(),
@@ -19,6 +29,9 @@ const PatchSchema = z.object({
   finish_onboarding: z.boolean().optional(),
 });
 
+const PROFILE_COLS =
+  "nickname, nickname_changed_at, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at";
+
 export async function GET() {
   const supabase = await supabaseServer();
   const {
@@ -28,9 +41,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select(
-      "nickname, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at",
-    )
+    .select(PROFILE_COLS)
     .eq("id", user.id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -53,13 +64,45 @@ export async function PATCH(req: Request) {
   const { data: current } = await supabase
     .from("profiles")
     .select(
-      "sex, birth_year, height_cm, current_weight_kg, activity_level, goal_type, goal_auto, goal_kcal",
+      "nickname, nickname_changed_at, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_type, goal_auto, goal_kcal",
     )
     .eq("id", user.id)
     .maybeSingle();
 
   const merged = { ...(current ?? {}), ...patch };
   const update: Record<string, unknown> = { ...patch };
+
+  if ("nickname" in patch && patch.nickname != null) {
+    const next = patch.nickname.trim();
+    const prev = (current?.nickname ?? "").trim();
+    if (next !== prev) {
+      if (current?.nickname_changed_at) {
+        const last = new Date(current.nickname_changed_at).getTime();
+        const hoursSince = (Date.now() - last) / 36e5;
+        if (hoursSince < 24) {
+          const waitH = Math.max(1, Math.ceil(24 - hoursSince));
+          return NextResponse.json(
+            { error: "nickname_rate_limited", retry_in_hours: waitH },
+            { status: 429 },
+          );
+        }
+      }
+      const admin = supabaseAdmin();
+      const { data: dup } = await admin
+        .from("profiles")
+        .select("id")
+        .ilike("nickname", next)
+        .neq("id", user.id)
+        .maybeSingle();
+      if (dup) {
+        return NextResponse.json({ error: "nickname_taken" }, { status: 409 });
+      }
+      update.nickname = next;
+      update.nickname_changed_at = new Date().toISOString();
+    } else {
+      delete update.nickname;
+    }
+  }
 
   const canAuto =
     merged.sex &&
@@ -95,6 +138,11 @@ export async function PATCH(req: Request) {
   }
 
   const { error } = await supabase.from("profiles").update(update).eq("id", user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "nickname_taken" }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, applied: update });
 }
