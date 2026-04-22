@@ -7,8 +7,8 @@
     { "dir": "3-multi-food", "name": "multi-food", "status": "pending", "gate": "share-split UX works, 한상차림 인식 동작 확인" },
     { "dir": "3-5-ux-polish", "name": "ux-polish", "status": "completed", "gate": "리텐션·바이럴 번들 완료: Undo·끼니수정·저장애니·빈상태·스켈레톤·썸네일·주간차트·수동추가·공유카드" },
     { "dir": "4-diary", "name": "diary", "status": "completed", "gate": "끼니별 요약·메모·날짜 네비·사진 갤러리 동작 완료" },
-    { "dir": "4-5-diary-polish", "name": "diary-polish", "status": "in_progress", "gate": "ESC·추정 힌트·메모 보호·서명 URL 갱신·실패 재시도" },
-    { "dir": "5-goals-stats", "name": "goals-stats", "status": "pending" },
+    { "dir": "4-5-diary-polish", "name": "diary-polish", "status": "completed", "gate": "ESC·추정 힌트·메모 보호·서명 URL 갱신·실패 재시도" },
+    { "dir": "5-goals-stats", "name": "goals-stats", "status": "in_progress", "gate": "코드 완성 · 0005/0006 마이그레이션 Supabase에 적용 필요" },
     { "dir": "6-pwa-polish", "name": "pwa-polish", "status": "pending", "gate": "Lighthouse PWA >= 90, E2E < 10s" }
   ]
 }

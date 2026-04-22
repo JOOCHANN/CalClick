@@ -13,6 +13,7 @@ import {
   Pencil,
   LayoutGrid,
   Image as ImageIcon,
+  Scale,
 } from "lucide-react";
 import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
 
@@ -22,6 +23,13 @@ type Weekly = {
   prev_days: Day[];
   current_avg: number;
   prev_avg: number;
+};
+type Monthly = {
+  months: { month: string; avg_kcal: number; active_days: number }[];
+};
+type Profile = {
+  goal_kcal: number | null;
+  onboarded_at: string | null;
 };
 type Stats = {
   month: string;
@@ -126,6 +134,14 @@ export default function MePage() {
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [photosFetchedAt, setPhotosFetchedAt] = useState(0);
   const [photosRefreshKey, setPhotosRefreshKey] = useState(0);
+  const [weightLogs, setWeightLogs] = useState<
+    { logged_on: string; weight_kg: number }[]
+  >([]);
+  const [weightInput, setWeightInput] = useState("");
+  const [weightSaving, setWeightSaving] = useState(false);
+  const [weightEditing, setWeightEditing] = useState(false);
+  const [monthly, setMonthly] = useState<Monthly | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   const loadPhoto = useCallback(async (mealId: string) => {
     setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
@@ -171,6 +187,74 @@ export default function MePage() {
       setWeekly(await res.json());
     })();
   }, []);
+
+  const loadWeights = useCallback(async () => {
+    const res = await fetch("/api/weight?days=90");
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      logs: { logged_on: string; weight_kg: number }[];
+    };
+    setWeightLogs(data.logs);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch("/api/weight?days=90");
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        logs: { logged_on: string; weight_kg: number }[];
+      };
+      if (!cancelled) setWeightLogs(data.logs);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [mRes, pRes] = await Promise.all([
+        fetch("/api/stats/monthly?n=6"),
+        fetch("/api/profile"),
+      ]);
+      if (mRes.ok && !cancelled) setMonthly(await mRes.json());
+      if (pRes.ok && !cancelled) {
+        const { profile } = (await pRes.json()) as { profile: Profile | null };
+        setProfile(profile);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const todayWeight = weightLogs.find((l) => l.logged_on === todayKey)?.weight_kg ?? null;
+  const lastWeight = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight_kg : null;
+  const weightDelta =
+    weightLogs.length >= 2
+      ? Number((weightLogs[weightLogs.length - 1].weight_kg - weightLogs[0].weight_kg).toFixed(1))
+      : null;
+
+  const saveWeight = async () => {
+    const n = Number(weightInput);
+    if (!Number.isFinite(n) || n < 20 || n > 400) return;
+    setWeightSaving(true);
+    try {
+      const res = await fetch("/api/weight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weight_kg: n }),
+      });
+      if (!res.ok) return;
+      setWeightEditing(false);
+      setWeightInput("");
+      void loadWeights();
+    } finally {
+      setWeightSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (view !== "gallery") return;
@@ -543,6 +627,165 @@ export default function MePage() {
               );
             })}
           </div>
+        </section>
+      )}
+
+      {/* 체중 카드 */}
+      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5">
+            <Scale className="w-4 h-4 text-brand-500" />
+            체중
+          </h2>
+          {weightDelta != null && weightLogs.length >= 2 && (
+            <span
+              className={`text-[11px] font-bold ${
+                weightDelta > 0
+                  ? "text-brand-600"
+                  : weightDelta < 0
+                    ? "text-mint-600"
+                    : "text-ink-500"
+              }`}
+            >
+              {weightDelta > 0 ? "+" : ""}
+              {weightDelta} kg · 90일
+            </span>
+          )}
+        </div>
+        {weightEditing ? (
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="decimal"
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              placeholder={lastWeight ? String(lastWeight) : "예: 65.5"}
+              autoFocus
+              className="flex-1 px-3 py-2 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm tabular-nums"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setWeightEditing(false);
+                setWeightInput("");
+              }}
+              className="px-3 py-2 text-xs rounded-xl bg-cream-100 text-ink-500"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={saveWeight}
+              disabled={weightSaving || !weightInput}
+              className="px-4 py-2 text-xs rounded-xl bg-brand-500 text-white font-bold disabled:opacity-50"
+            >
+              {weightSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "저장"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setWeightInput(todayWeight ? String(todayWeight) : lastWeight ? String(lastWeight) : "");
+              setWeightEditing(true);
+            }}
+            className="text-left flex items-baseline gap-2 active:scale-[0.98] transition"
+          >
+            <span className="text-3xl font-black italic tabular-nums text-ink-900">
+              {todayWeight ?? lastWeight ?? "—"}
+            </span>
+            <span className="text-sm text-ink-500">kg</span>
+            {todayWeight == null && (
+              <span className="text-[11px] text-brand-600 font-medium ml-auto">
+                오늘 기록하기 →
+              </span>
+            )}
+          </button>
+        )}
+        {weightLogs.length >= 2 &&
+          (() => {
+            const w = 280;
+            const h = 48;
+            const vals = weightLogs.map((l) => l.weight_kg);
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            const range = Math.max(0.5, max - min);
+            const pts = weightLogs
+              .map((l, i) => {
+                const x = (i / Math.max(1, weightLogs.length - 1)) * w;
+                const y = h - ((l.weight_kg - min) / range) * h;
+                return `${x.toFixed(1)},${y.toFixed(1)}`;
+              })
+              .join(" ");
+            return (
+              <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12" preserveAspectRatio="none">
+                <polyline
+                  points={pts}
+                  fill="none"
+                  stroke="#FF8A95"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            );
+          })()}
+      </section>
+
+      {/* 월간 추세 */}
+      {monthly && monthly.months.some((m) => m.avg_kcal > 0) && (
+        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">월별 일 평균</h2>
+            {profile?.goal_kcal && (
+              <span className="text-[10px] text-ink-500">
+                목표 {profile.goal_kcal} kcal
+              </span>
+            )}
+          </div>
+          {(() => {
+            const goal = profile?.goal_kcal ?? 0;
+            const maxVal = Math.max(goal, ...monthly.months.map((m) => m.avg_kcal), 1);
+            return (
+              <div className="flex items-end justify-between gap-2 h-28 relative">
+                {goal > 0 && (
+                  <span
+                    className="absolute left-0 right-0 border-t border-dashed border-brand-300/70"
+                    style={{ bottom: `${(goal / maxVal) * 100}%` }}
+                    aria-hidden
+                  />
+                )}
+                {monthly.months.map((m) => {
+                  const pct = m.avg_kcal === 0 ? 0 : (m.avg_kcal / maxVal) * 100;
+                  const over = goal > 0 && m.avg_kcal > goal;
+                  const [, mm] = m.month.split("-");
+                  return (
+                    <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-[9px] tabular-nums text-ink-500 h-3">
+                        {m.avg_kcal > 0 ? m.avg_kcal : ""}
+                      </span>
+                      <div className="w-full flex-1 flex items-end">
+                        <div
+                          className={`w-full rounded-t-lg transition ${
+                            m.avg_kcal === 0
+                              ? "bg-cream-100"
+                              : over
+                                ? "bg-gradient-to-t from-brand-600 to-brand-400"
+                                : "bg-mint-300"
+                          }`}
+                          style={{ height: `${Math.max(m.avg_kcal === 0 ? 6 : 12, pct)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-medium text-ink-500 tabular-nums">
+                        {Number(mm)}월
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </section>
       )}
 

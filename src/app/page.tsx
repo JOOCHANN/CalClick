@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Camera, Loader2, Pencil, Trash2, Check, X, Plus, Search } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +68,7 @@ function todayRange(): { from: string; to: string } {
 }
 
 export default function Home() {
+  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -234,10 +236,28 @@ export default function Home() {
   }, [fetchToday]);
 
   useEffect(() => {
-    const saved = Number(localStorage.getItem("goal_kcal"));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (Number.isFinite(saved) && saved > 0) setGoalKcal(saved);
-  }, []);
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch("/api/profile");
+      if (!res.ok) {
+        const saved = Number(localStorage.getItem("goal_kcal"));
+        if (!cancelled && Number.isFinite(saved) && saved > 0) setGoalKcal(saved);
+        return;
+      }
+      const { profile } = (await res.json()) as {
+        profile: { goal_kcal: number | null; onboarded_at: string | null } | null;
+      };
+      if (cancelled) return;
+      if (!profile?.onboarded_at) {
+        router.replace("/onboarding");
+        return;
+      }
+      if (profile.goal_kcal) setGoalKcal(profile.goal_kcal);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const saveGoal = () => {
     const n = Math.round(Number(goalDraft));
@@ -245,6 +265,11 @@ export default function Home() {
     if (!Number.isFinite(n) || n < 500 || n > 6000) return;
     setGoalKcal(n);
     localStorage.setItem("goal_kcal", String(n));
+    void fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal_kcal: n, goal_auto: false }),
+    });
   };
 
   const rawTotal = items

@@ -1,6 +1,20 @@
 {
   "project": "CalClick",
   "phase": "goals-stats",
-  "description": "프로필 온보딩, BMR/TDEE, 목표 kcal, 주/월 그래프 (Recharts), 체중 로그.",
-  "steps": []
+  "description": "프로필 온보딩 + BMR/TDEE 자동 목표 + 홈 progress ring + 체중 로그 + 장기 추세 차트.",
+  "goal_line": "내 몸·목표를 한 번 입력하면 오늘 남은 kcal과 체중 추세를 같이 보여 준다.",
+  "gate": "목표 링 표시·체중 로그 upsert·월간 평균/체중 차트 동작, RLS 격리 확인",
+  "steps": [
+    { "name": "step1-schema-profile-api", "desc": "0005 profiles 확장 + 0006 weight_logs + GET/PATCH /api/profile" },
+    { "name": "step2-onboarding", "desc": "첫 로그인 시 3스텝 온보딩 → onboarded_at 세팅" },
+    { "name": "step3-home-ring", "desc": "홈 상단 목표 대비 progress ring, 초과/미설정 상태 포함" },
+    { "name": "step4-weight-log", "desc": "POST /api/weight upsert + 마이 '오늘 체중' 카드·스파크라인" },
+    { "name": "step5-trend-charts", "desc": "Recharts dynamic import · 월간 평균 kcal · 체중 90일 라인" },
+    { "name": "step6-settings-goal", "desc": "/settings 에 프로필·목표 편집 섹션, 자동/수동 전환" }
+  ],
+  "deferred": [
+    "주간 차트 빈 상태",
+    "편집 모드 unsaved drafts confirm",
+    "모달 포커스 트랩 (a11y)"
+  ]
 }
