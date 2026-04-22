@@ -81,9 +81,6 @@ export default function Home() {
   const [goalDraft, setGoalDraft] = useState("");
   const [todayMeals, setTodayMeals] = useState<TodayMeal[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editKcal, setEditKcal] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [editingNameKey, setEditingNameKey] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -107,6 +104,10 @@ export default function Home() {
   } | null>(null);
   const [manualGrams, setManualGrams] = useState(200);
   const [manualSaving, setManualSaving] = useState(false);
+  const [manualCustom, setManualCustom] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customKcal100, setCustomKcal100] = useState("");
+  const [customEstimating, setCustomEstimating] = useState(false);
   const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
@@ -149,40 +150,6 @@ export default function Home() {
         },
       },
     });
-  };
-
-  const saveEdit = async (id: string) => {
-    const n = Math.round(Number(editKcal));
-    setEditingId(null);
-    if (!Number.isFinite(n) || n < 0) return;
-    const current = todayMeals.find((m) => m.id === id);
-    if (!current || current.total_kcal === n) return;
-    const res = await fetch(`/api/meals/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ total_kcal: n }),
-    });
-    if (!res.ok) {
-      toast.error("수정 실패");
-      return;
-    }
-    fetchToday();
-  };
-
-  const saveItemEdit = async (itemId: string, prevKcal: number) => {
-    const n = Math.round(Number(editKcal));
-    setEditingItemId(null);
-    if (!Number.isFinite(n) || n < 0 || n === prevKcal) return;
-    const res = await fetch(`/api/meal-items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kcal: n }),
-    });
-    if (!res.ok) {
-      toast.error("수정 실패");
-      return;
-    }
-    fetchToday();
   };
 
   const enterMealEdit = (m: TodayMeal) => {
@@ -397,24 +364,62 @@ export default function Home() {
     setManualResults([]);
     setManualSelected(null);
     setManualGrams(200);
+    setManualCustom(false);
+    setCustomName("");
+    setCustomKcal100("");
+  };
+
+  const estimateCustomKcal = async () => {
+    const name = customName.trim();
+    if (!name) return;
+    setCustomEstimating(true);
+    try {
+      const res = await fetch("/api/foods/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        toast.error("추천 실패");
+        return;
+      }
+      const { kcal_per_100g } = (await res.json()) as { kcal_per_100g: number };
+      setCustomKcal100(String(kcal_per_100g));
+    } finally {
+      setCustomEstimating(false);
+    }
   };
 
   const saveManualMeal = async () => {
-    if (!manualSelected) return;
     setManualSaving(true);
     try {
+      const candidate = manualCustom
+        ? (() => {
+            const name = customName.trim();
+            const k = Number(customKcal100);
+            if (!name || !Number.isFinite(k) || k < 0) return null;
+            return {
+              name,
+              grams: manualGrams,
+              kcalPer100g: k,
+              source: "llm" as const,
+            };
+          })()
+        : manualSelected
+          ? {
+              name: manualSelected.official_name,
+              grams: manualGrams,
+              kcalPer100g: manualSelected.kcal_per_100g,
+              source: "db" as const,
+            }
+          : null;
+      if (!candidate) return;
+
       const res = await fetch("/api/meals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          candidates: [
-            {
-              name: manualSelected.official_name,
-              grams: manualGrams,
-              kcalPer100g: manualSelected.kcal_per_100g,
-              source: "db",
-            },
-          ],
+          candidates: [candidate],
           mealType,
           shareCount: 1,
         }),
@@ -498,7 +503,10 @@ export default function Home() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="CalClick" className="w-9 h-9 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)]" />
           <div className="flex flex-col leading-tight">
-            <h1 className="text-lg font-bold tracking-tight">CalClick</h1>
+            <h1 className="text-lg font-bold tracking-tight">
+              <span className="text-brand-600">C</span>al
+              <span className="text-brand-600">C</span>lick
+            </h1>
             <span className="text-[10px] text-ink-500">오늘도 예쁘게, 건강하게 🌿</span>
           </div>
         </div>
@@ -596,7 +604,6 @@ export default function Home() {
             const mealName = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
             const isEditMode = editModeMealId === m.id;
             const open = expandedId === m.id || isEditMode;
-            const editing = editingId === m.id;
             return (
               <Card key={m.id} className="overflow-hidden py-0 gap-0">
                 <button
@@ -614,37 +621,9 @@ export default function Home() {
                     </span>
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
-                    {editing ? (
-                      <input
-                        type="number"
-                        autoFocus
-                        value={editKcal}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditKcal(e.target.value)}
-                        onBlur={() => saveEdit(m.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.currentTarget.blur();
-                          } else if (e.key === "Escape") {
-                            setEditingId(null);
-                          }
-                        }}
-                        className="w-20 text-right text-lg tabular-nums text-brand-600 bg-transparent border-b border-brand-500 outline-none"
-                      />
-                    ) : (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingId(m.id);
-                          setEditKcal(m.total_kcal.toString());
-                        }}
-                        className="text-lg tabular-nums text-brand-600 hover:underline"
-                      >
-                        {m.total_kcal} kcal
-                      </span>
-                    )}
+                    <span className="text-lg tabular-nums text-brand-600">
+                      {m.total_kcal} kcal
+                    </span>
                     <span
                       role="button"
                       tabIndex={0}
@@ -677,47 +656,20 @@ export default function Home() {
                     {m.share_count > 1 && (
                       <div className="text-xs text-neutral-500 mb-1">{m.share_count}인 공유</div>
                     )}
-                    {m.items.map((it) => {
-                      const itemEditing = editingItemId === it.id;
-                      return (
-                        <div key={it.id} className="flex justify-between items-center">
-                          <span className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
-                              {it.emoji ?? foodEmoji(it.name)}
-                            </span>
-                            <span>
-                              {it.name}{" "}
-                              <span className="text-neutral-400 text-xs">{it.grams}g</span>
-                            </span>
+                    {m.items.map((it) => (
+                      <div key={it.id} className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-cream-100 text-sm shrink-0 rotate-[-4deg] shadow-[0_2px_4px_rgba(0,0,0,0.04)]">
+                            {it.emoji ?? foodEmoji(it.name)}
                           </span>
-                          {itemEditing ? (
-                            <input
-                              type="number"
-                              autoFocus
-                              value={editKcal}
-                              onChange={(e) => setEditKcal(e.target.value)}
-                              onBlur={() => saveItemEdit(it.id, it.kcal)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") e.currentTarget.blur();
-                                else if (e.key === "Escape") setEditingItemId(null);
-                              }}
-                              className="w-20 text-right tabular-nums text-neutral-700 bg-transparent border-b border-neutral-400 outline-none"
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingItemId(it.id);
-                                setEditKcal(it.kcal.toString());
-                              }}
-                              className="tabular-nums text-neutral-500 hover:underline"
-                            >
-                              {it.kcal} kcal
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
+                          <span>
+                            {it.name}{" "}
+                            <span className="text-neutral-400 text-xs">{it.grams}g</span>
+                          </span>
+                        </span>
+                        <span className="tabular-nums text-neutral-500">{it.kcal} kcal</span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {isEditMode && (
@@ -1108,59 +1060,160 @@ export default function Home() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
-              <input
-                type="text"
-                value={manualQuery}
-                onChange={(e) => setManualQuery(e.target.value)}
-                placeholder="예: 김치찌개, 바나나, 아메리카노"
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
-                autoFocus
-              />
+            <div className="flex bg-cream-50 rounded-xl p-1 text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setManualCustom(false);
+                  setManualSelected(null);
+                }}
+                className={`flex-1 py-1.5 rounded-lg transition ${
+                  !manualCustom ? "bg-white text-brand-600 font-bold shadow-sm" : "text-ink-500"
+                }`}
+              >
+                추천 검색
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualCustom(true);
+                  setManualSelected(null);
+                  if (!customName && manualQuery) setCustomName(manualQuery);
+                }}
+                className={`flex-1 py-1.5 rounded-lg transition ${
+                  manualCustom ? "bg-white text-brand-600 font-bold shadow-sm" : "text-ink-500"
+                }`}
+              >
+                직접 입력
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto flex flex-col gap-1 min-h-[120px]">
-              {manualSearching && manualResults.length === 0 ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="w-4 h-4 animate-spin text-ink-500" />
+
+            {!manualCustom && (
+              <>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
+                  <input
+                    type="text"
+                    value={manualQuery}
+                    onChange={(e) => setManualQuery(e.target.value)}
+                    placeholder="예: 김치찌개, 바나나, 아메리카노"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
+                    autoFocus
+                  />
                 </div>
-              ) : manualResults.length === 0 ? (
-                <p className="text-center text-xs text-ink-500 py-6">
-                  {manualQuery.trim() ? "검색 결과가 없어요" : "음식을 검색해 보세요"}
-                </p>
-              ) : (
-                manualResults.map((r) => {
-                  const selected = manualSelected?.food_id === r.food_id;
-                  return (
+                <div className="flex-1 overflow-y-auto flex flex-col gap-1 min-h-[120px]">
+                  {manualSearching && manualResults.length === 0 ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-4 h-4 animate-spin text-ink-500" />
+                    </div>
+                  ) : manualResults.length === 0 ? (
+                    <div className="text-center text-xs text-ink-500 py-6 flex flex-col gap-2">
+                      <span>
+                        {manualQuery.trim() ? "검색 결과가 없어요" : "음식을 검색해 보세요"}
+                      </span>
+                      {manualQuery.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomName(manualQuery.trim());
+                            setManualCustom(true);
+                          }}
+                          className="text-brand-600 font-medium underline"
+                        >
+                          &quot;{manualQuery.trim()}&quot; 직접 입력하기
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    manualResults.map((r) => {
+                      const selected = manualSelected?.food_id === r.food_id;
+                      return (
+                        <button
+                          key={r.food_id}
+                          type="button"
+                          onClick={() => setManualSelected(r)}
+                          className={`text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
+                            selected
+                              ? "bg-brand-50 ring-1 ring-brand-400"
+                              : "hover:bg-cream-50"
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="text-base">{foodEmoji(r.official_name)}</span>
+                            <span className="truncate text-sm">{r.official_name}</span>
+                          </span>
+                          <span className="text-[11px] text-ink-500 tabular-nums shrink-0">
+                            {Math.round(r.kcal_per_100g)} kcal/100g
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+
+            {manualCustom && (
+              <div className="flex flex-col gap-2.5">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-500 font-medium">음식 이름</span>
+                  <input
+                    type="text"
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="예: 엄마표 잡채"
+                    className="px-3 py-2.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
+                    autoFocus
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-ink-500 font-medium">100g당 칼로리</span>
                     <button
-                      key={r.food_id}
                       type="button"
-                      onClick={() => setManualSelected(r)}
-                      className={`text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
-                        selected
-                          ? "bg-brand-50 ring-1 ring-brand-400"
-                          : "hover:bg-cream-50"
-                      }`}
+                      onClick={estimateCustomKcal}
+                      disabled={!customName.trim() || customEstimating}
+                      className="text-[11px] text-brand-600 font-medium disabled:opacity-40 flex items-center gap-1"
                     >
-                      <span className="flex items-center gap-2 min-w-0">
-                        <span className="text-base">{foodEmoji(r.official_name)}</span>
-                        <span className="truncate text-sm">{r.official_name}</span>
-                      </span>
-                      <span className="text-[11px] text-ink-500 tabular-nums shrink-0">
-                        {Math.round(r.kcal_per_100g)} kcal/100g
-                      </span>
+                      {customEstimating ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        "✨"
+                      )}
+                      AI 추천받기
                     </button>
-                  );
-                })
-              )}
-            </div>
-            {manualSelected && (
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={customKcal100}
+                      onChange={(e) => setCustomKcal100(e.target.value)}
+                      placeholder="예: 150"
+                      className="w-full px-3 py-2.5 pr-14 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm tabular-nums"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-500">
+                      kcal
+                    </span>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {(manualSelected || (manualCustom && customName.trim() && customKcal100)) && (
               <div className="flex flex-col gap-2 pt-2 border-t border-brand-100">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">중량</span>
                   <span className="text-sm font-bold tabular-nums text-brand-600">
                     {manualGrams}g ·{" "}
-                    {Math.round((manualSelected.kcal_per_100g * manualGrams) / 100)} kcal
+                    {Math.round(
+                      ((manualCustom
+                        ? Number(customKcal100) || 0
+                        : manualSelected?.kcal_per_100g ?? 0) *
+                        manualGrams) /
+                        100,
+                    )}{" "}
+                    kcal
                   </span>
                 </div>
                 <Slider
