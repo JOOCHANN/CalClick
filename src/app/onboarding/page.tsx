@@ -25,6 +25,7 @@ const thisYear = new Date().getFullYear();
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [nickname, setNickname] = useState("");
   const [sex, setSex] = useState<Sex | null>(null);
   const [birthYear, setBirthYear] = useState<string>("");
   const [heightCm, setHeightCm] = useState<string>("");
@@ -44,6 +45,7 @@ export default function OnboardingPage() {
           return;
         }
         if (profile) {
+          if (profile.nickname) setNickname(profile.nickname);
           if (profile.sex) setSex(profile.sex);
           if (profile.birth_year) setBirthYear(String(profile.birth_year));
           if (profile.height_cm) setHeightCm(String(profile.height_cm));
@@ -71,7 +73,13 @@ export default function OnboardingPage() {
     });
   }, [sex, birthYear, heightCm, weightKg, activity, goal]);
 
-  const canNextStep0 = !!sex && !!birthYear && Number(birthYear) >= 1900 && !!heightCm;
+  const canNextStep0 =
+    nickname.trim().length >= 1 &&
+    nickname.trim().length <= 20 &&
+    !!sex &&
+    !!birthYear &&
+    Number(birthYear) >= 1900 &&
+    !!heightCm;
   const canNextStep1 = !!weightKg && !!activity;
   const canFinish = !!goal && !!preview;
 
@@ -83,6 +91,7 @@ export default function OnboardingPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          nickname: nickname.trim(),
           sex,
           birth_year: Number(birthYear),
           height_cm: Number(heightCm),
@@ -152,6 +161,18 @@ export default function OnboardingPage() {
               목표 칼로리를 계산하기 위해 기본 정보만 받을게요.
             </p>
           </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-ink-500">닉네임</span>
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="예: 민수"
+              maxLength={20}
+              className="px-3 py-2.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
+            />
+          </label>
 
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium text-ink-500">성별</span>

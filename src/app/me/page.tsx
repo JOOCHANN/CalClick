@@ -16,6 +16,8 @@ import {
   Scale,
 } from "lucide-react";
 import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
+import { motivationLine } from "@/lib/motivation";
+import type { GoalType } from "@/lib/calorie-targets";
 
 type Day = { date: string; total_kcal: number };
 type Weekly = {
@@ -28,7 +30,9 @@ type Monthly = {
   months: { month: string; avg_kcal: number; active_days: number }[];
 };
 type Profile = {
+  nickname: string | null;
   goal_kcal: number | null;
+  goal_type: GoalType | null;
   onboarded_at: string | null;
 };
 type Stats = {
@@ -486,22 +490,52 @@ export default function MePage() {
   };
 
   return (
-    <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-5">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="CalClick" className="w-8 h-8 rounded-xl shadow-[0_4px_12px_rgba(255,138,149,0.3)]" />
-          <h1 className="text-xl font-black italic tracking-[-0.04em]">마이</h1>
-        </div>
-        {streak > 0 && (
-          <span className="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1 ring-1 ring-brand-100">
-            🔥 {streak}일째
-          </span>
-        )}
-      </header>
+    <main className="flex-1 w-full max-w-md mx-auto px-4 py-5 flex flex-col gap-4">
+      {(() => {
+        const todayEntry = weekly?.days.find((d) => d.date === todayKey);
+        const todayKcal = todayEntry?.total_kcal ?? 0;
+        const goal = profile?.goal_kcal ?? null;
+        const remaining = goal ? goal - todayKcal : null;
+        const ratio = goal ? todayKcal / goal : null;
+        const nick = profile?.nickname?.trim() || "오늘";
+        const motiv = motivationLine({
+          goal: profile?.goal_type ?? null,
+          remaining,
+          ratio,
+          streak,
+        });
+        return (
+          <header className="flex items-start justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.svg"
+                alt="CalClick"
+                className="w-10 h-10 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)] shrink-0"
+              />
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-xl font-black italic tracking-[-0.04em] leading-none truncate">
+                  <span className="bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent">
+                    {nick}
+                  </span>
+                  <span className="text-ink-900">님</span>
+                </h1>
+                <p className="text-[11px] text-ink-500 mt-1 leading-snug line-clamp-2">
+                  {motiv}
+                </p>
+              </div>
+            </div>
+            {streak > 0 && (
+              <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-brand-100 shrink-0">
+                🔥 {streak}일째
+              </span>
+            )}
+          </header>
+        );
+      })()}
 
       {/* 월 요약 카드 */}
-      <section className="relative rounded-3xl bg-gradient-to-br from-brand-400 to-brand-600 text-white p-5 shadow-[0_12px_32px_-8px_rgba(255,138,149,0.45)] overflow-hidden">
+      <section className="relative rounded-3xl bg-gradient-to-br from-brand-400 to-brand-600 text-white p-4 shadow-[0_12px_32px_-8px_rgba(255,138,149,0.45)] overflow-hidden">
         <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-xl" aria-hidden />
         <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl" aria-hidden />
         <div className="flex items-center justify-between mb-3">
@@ -529,17 +563,17 @@ export default function MePage() {
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <div className="text-[10px] text-white/70">합계</div>
-            <div className="text-xl font-semibold tabular-nums">{stats?.total_kcal ?? 0}</div>
+            <div className="text-lg font-semibold tabular-nums">{stats?.total_kcal ?? 0}</div>
             <div className="text-[9px] text-white/60">kcal</div>
           </div>
           <div className="border-x border-white/20">
             <div className="text-[10px] text-white/70">일 평균</div>
-            <div className="text-xl font-semibold tabular-nums">{stats?.avg_kcal ?? 0}</div>
+            <div className="text-lg font-semibold tabular-nums">{stats?.avg_kcal ?? 0}</div>
             <div className="text-[9px] text-white/60">kcal</div>
           </div>
           <div>
             <div className="text-[10px] text-white/70">기록 일수</div>
-            <div className="text-xl font-semibold tabular-nums">{stats?.active_days ?? 0}</div>
+            <div className="text-lg font-semibold tabular-nums">{stats?.active_days ?? 0}</div>
             <div className="text-[9px] text-white/60">일</div>
           </div>
         </div>
@@ -547,7 +581,7 @@ export default function MePage() {
 
       {/* 주간 차트 */}
       {weekly && (
-        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-2">
               <h2 className="text-sm font-semibold">이번 주</h2>
@@ -578,7 +612,7 @@ export default function MePage() {
               </button>
             )}
           </div>
-          <div className="flex items-end justify-between gap-1.5 h-28">
+          <div className="flex items-end justify-between gap-1.5 h-20">
             {weekly.days.map((d, i) => {
               const max = Math.max(1, ...weekly.days.map((x) => x.total_kcal));
               const pct = (d.total_kcal / max) * 100;
@@ -631,10 +665,10 @@ export default function MePage() {
       )}
 
       {/* 체중 카드 */}
-      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+      <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold flex items-center gap-1.5">
-            <Scale className="w-4 h-4 text-brand-500" />
+          <h2 className="text-xs font-semibold flex items-center gap-1.5 text-ink-500">
+            <Scale className="w-3.5 h-3.5 text-brand-500" />
             체중
           </h2>
           {weightDelta != null && weightLogs.length >= 2 && (
@@ -689,55 +723,61 @@ export default function MePage() {
               setWeightInput(todayWeight ? String(todayWeight) : lastWeight ? String(lastWeight) : "");
               setWeightEditing(true);
             }}
-            className="text-left flex items-baseline gap-2 active:scale-[0.98] transition"
+            className="text-left flex items-center gap-3 active:scale-[0.98] transition"
           >
-            <span className="text-3xl font-black italic tabular-nums text-ink-900">
-              {todayWeight ?? lastWeight ?? "—"}
-            </span>
-            <span className="text-sm text-ink-500">kg</span>
+            <div className="flex items-baseline gap-1.5 shrink-0">
+              <span className="text-2xl font-black italic tabular-nums text-ink-900 leading-none">
+                {todayWeight ?? lastWeight ?? "—"}
+              </span>
+              <span className="text-xs text-ink-500">kg</span>
+            </div>
+            {weightLogs.length >= 2 &&
+              (() => {
+                const w = 200;
+                const h = 32;
+                const vals = weightLogs.map((l) => l.weight_kg);
+                const min = Math.min(...vals);
+                const max = Math.max(...vals);
+                const range = Math.max(0.5, max - min);
+                const pts = weightLogs
+                  .map((l, i) => {
+                    const x = (i / Math.max(1, weightLogs.length - 1)) * w;
+                    const y = h - ((l.weight_kg - min) / range) * h;
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                  })
+                  .join(" ");
+                return (
+                  <svg
+                    viewBox={`0 0 ${w} ${h}`}
+                    className="flex-1 h-8"
+                    preserveAspectRatio="none"
+                  >
+                    <polyline
+                      points={pts}
+                      fill="none"
+                      stroke="#FF8A95"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                );
+              })()}
             {todayWeight == null && (
-              <span className="text-[11px] text-brand-600 font-medium ml-auto">
-                오늘 기록하기 →
+              <span className="text-[11px] text-brand-600 font-medium ml-auto shrink-0">
+                기록하기 →
               </span>
             )}
           </button>
         )}
-        {weightLogs.length >= 2 &&
-          (() => {
-            const w = 280;
-            const h = 48;
-            const vals = weightLogs.map((l) => l.weight_kg);
-            const min = Math.min(...vals);
-            const max = Math.max(...vals);
-            const range = Math.max(0.5, max - min);
-            const pts = weightLogs
-              .map((l, i) => {
-                const x = (i / Math.max(1, weightLogs.length - 1)) * w;
-                const y = h - ((l.weight_kg - min) / range) * h;
-                return `${x.toFixed(1)},${y.toFixed(1)}`;
-              })
-              .join(" ");
-            return (
-              <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12" preserveAspectRatio="none">
-                <polyline
-                  points={pts}
-                  fill="none"
-                  stroke="#FF8A95"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </svg>
-            );
-          })()}
       </section>
 
       {/* 월간 추세 */}
       {monthly && monthly.months.some((m) => m.avg_kcal > 0) && (
-        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 px-4 py-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">월별 일 평균</h2>
+            <h2 className="text-xs font-semibold text-ink-500">월별 일 평균</h2>
             {profile?.goal_kcal && (
               <span className="text-[10px] text-ink-500">
                 목표 {profile.goal_kcal} kcal
@@ -748,7 +788,7 @@ export default function MePage() {
             const goal = profile?.goal_kcal ?? 0;
             const maxVal = Math.max(goal, ...monthly.months.map((m) => m.avg_kcal), 1);
             return (
-              <div className="flex items-end justify-between gap-2 h-28 relative">
+              <div className="flex items-end justify-between gap-2 h-20 relative">
                 {goal > 0 && (
                   <span
                     className="absolute left-0 right-0 border-t border-dashed border-brand-300/70"

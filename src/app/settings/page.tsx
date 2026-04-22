@@ -13,6 +13,7 @@ import {
 } from "@/lib/calorie-targets";
 
 type Profile = {
+  nickname: string | null;
   sex: Sex | null;
   birth_year: number | null;
   height_cm: number | null;
@@ -43,6 +44,8 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [nickname, setNickname] = useState("");
+  const [nicknameSaving, setNicknameSaving] = useState(false);
   const [goalType, setGoalType] = useState<GoalType | null>(null);
   const [activity, setActivity] = useState<ActivityLevel | null>(null);
   const [goalAuto, setGoalAuto] = useState(true);
@@ -57,6 +60,7 @@ export default function SettingsPage() {
         const { profile: p } = (await res.json()) as { profile: Profile | null };
         setProfile(p);
         if (p) {
+          setNickname(p.nickname ?? "");
           setGoalType(p.goal_type);
           setActivity(p.activity_level);
           setGoalAuto(p.goal_auto);
@@ -150,6 +154,49 @@ export default function SettingsPage() {
         </div>
       ) : (
         <>
+          <section className="flex flex-col gap-3 rounded-2xl bg-white ring-1 ring-brand-100/60 p-4">
+            <h2 className="text-sm font-semibold">닉네임</h2>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="예: 민수"
+                maxLength={20}
+                className="flex-1 px-3 py-2 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
+              />
+              <button
+                type="button"
+                disabled={
+                  nicknameSaving ||
+                  nickname.trim().length === 0 ||
+                  nickname.trim() === (profile?.nickname ?? "")
+                }
+                onClick={async () => {
+                  setNicknameSaving(true);
+                  try {
+                    const res = await fetch("/api/profile", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ nickname: nickname.trim() }),
+                    });
+                    if (!res.ok) {
+                      toast.error("저장 실패");
+                      return;
+                    }
+                    setProfile((p) => (p ? { ...p, nickname: nickname.trim() } : p));
+                    toast.success("저장됨");
+                  } finally {
+                    setNicknameSaving(false);
+                  }
+                }}
+                className="px-4 py-2 text-xs rounded-xl bg-brand-500 text-white font-bold disabled:opacity-40"
+              >
+                {nicknameSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "저장"}
+              </button>
+            </div>
+          </section>
+
           <section className="flex flex-col gap-3 rounded-2xl bg-white ring-1 ring-brand-100/60 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">내 정보</h2>

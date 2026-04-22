@@ -4,6 +4,7 @@ import { supabaseServer } from "@/services/supabase-server";
 import { computeTargets } from "@/lib/calorie-targets";
 
 const PatchSchema = z.object({
+  nickname: z.string().trim().min(1).max(20).nullable().optional(),
   sex: z.enum(["male", "female"]).nullable().optional(),
   birth_year: z.number().int().min(1900).max(2100).nullable().optional(),
   height_cm: z.number().min(50).max(250).nullable().optional(),
@@ -28,7 +29,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at",
+      "nickname, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at",
     )
     .eq("id", user.id)
     .maybeSingle();
