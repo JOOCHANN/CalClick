@@ -63,3 +63,7 @@ export function foodEmoji(name: string): string {
   }
   return "🍽️";
 }
+
+export function displayFoodName(name: string): string {
+  return name.replace(/_/g, " ").trim();
+}

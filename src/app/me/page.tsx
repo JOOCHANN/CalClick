@@ -11,7 +11,7 @@ import {
   Loader2,
   Share2,
 } from "lucide-react";
-import { foodEmoji } from "@/lib/food-emoji";
+import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
 
 type Day = { date: string; total_kcal: number };
 type Weekly = {
@@ -315,7 +315,7 @@ export default function MePage() {
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="CalClick" className="w-8 h-8 rounded-xl shadow-[0_4px_12px_rgba(255,138,149,0.3)]" />
-          <h1 className="text-xl font-bold tracking-tight">마이</h1>
+          <h1 className="text-xl font-black italic tracking-[-0.04em]">마이</h1>
         </div>
         {streak > 0 && (
           <span className="text-xs font-bold text-brand-600 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1 ring-1 ring-brand-100">
@@ -574,7 +574,7 @@ export default function MePage() {
                                     {it.emoji ?? foodEmoji(it.name)}
                                   </span>
                                   <span className="truncate">
-                                    {it.name}{" "}
+                                    {displayFoodName(it.name)}{" "}
                                     <span className="text-neutral-400 text-xs tabular-nums">
                                       {it.grams}g
                                     </span>

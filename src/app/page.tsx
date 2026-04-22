@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resizeImage } from "@/lib/image-resize";
-import { foodEmoji, EMOJI_PALETTE } from "@/lib/food-emoji";
+import { foodEmoji, EMOJI_PALETTE, displayFoodName } from "@/lib/food-emoji";
 import type { FoodCandidate, RecognitionResult } from "@/types/recognition";
 
 type EditableCandidate = FoodCandidate & { editedGrams: number };
@@ -503,11 +503,10 @@ export default function Home() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="CalClick" className="w-9 h-9 rounded-2xl shadow-[0_6px_16px_-4px_rgba(255,138,149,0.4)]" />
           <div className="flex flex-col leading-tight">
-            <h1 className="text-lg font-bold tracking-tight">
-              <span className="text-brand-600">C</span>al
-              <span className="text-brand-600">C</span>lick
+            <h1 className="text-xl font-black italic tracking-[-0.04em] leading-none bg-gradient-to-br from-brand-500 to-brand-700 bg-clip-text text-transparent">
+              CalClick
             </h1>
-            <span className="text-[10px] text-ink-500">오늘도 예쁘게, 건강하게 🌿</span>
+            <span className="text-[10px] text-ink-500 mt-0.5">오늘도 예쁘게, 건강하게</span>
           </div>
         </div>
       </header>
@@ -617,7 +616,7 @@ export default function Home() {
                     </span>
                     <span className="text-sm text-neutral-600 tabular-nums">{time}</span>
                     <span className="text-xs text-neutral-400 truncate">
-                      {m.items.map((it) => it.name).join(", ")}
+                      {m.items.map((it) => displayFoodName(it.name)).join(", ")}
                     </span>
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
@@ -663,7 +662,7 @@ export default function Home() {
                             {it.emoji ?? foodEmoji(it.name)}
                           </span>
                           <span>
-                            {it.name}{" "}
+                            {displayFoodName(it.name)}{" "}
                             <span className="text-neutral-400 text-xs">{it.grams}g</span>
                           </span>
                         </span>
@@ -971,7 +970,7 @@ export default function Home() {
                                   className="truncate text-left hover:underline"
                                   title="이름 수정"
                                 >
-                                  {c.name}
+                                  {displayFoodName(c.name)}
                                 </button>
                               );
                             })()}
@@ -1140,7 +1139,7 @@ export default function Home() {
                         >
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="text-base">{foodEmoji(r.official_name)}</span>
-                            <span className="truncate text-sm">{r.official_name}</span>
+                            <span className="truncate text-sm">{displayFoodName(r.official_name)}</span>
                           </span>
                           <span className="text-[11px] text-ink-500 tabular-nums shrink-0">
                             {Math.round(r.kcal_per_100g)} kcal/100g
