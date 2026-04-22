@@ -124,6 +124,8 @@ export default function MePage() {
     { meal_id: string; eaten_at: string; total_kcal: number; url: string }[]
   >([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [photosFetchedAt, setPhotosFetchedAt] = useState(0);
+  const [photosRefreshKey, setPhotosRefreshKey] = useState(0);
 
   const loadPhoto = useCallback(async (mealId: string) => {
     setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
@@ -181,7 +183,10 @@ export default function MePage() {
         const data = (await res.json()) as {
           photos: { meal_id: string; eaten_at: string; total_kcal: number; url: string }[];
         };
-        if (!cancelled) setPhotos(data.photos);
+        if (!cancelled) {
+          setPhotos(data.photos);
+          setPhotosFetchedAt(Date.now());
+        }
       } finally {
         if (!cancelled) setLoadingPhotos(false);
       }
@@ -189,7 +194,18 @@ export default function MePage() {
     return () => {
       cancelled = true;
     };
-  }, [view, cursor]);
+  }, [view, cursor, photosRefreshKey]);
+
+  useEffect(() => {
+    if (view !== "gallery") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - photosFetchedAt < 8 * 60 * 1000) return;
+      setPhotosRefreshKey((k) => k + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [view, photosFetchedAt]);
 
   useEffect(() => {
     if (!selectedDate) {
@@ -208,6 +224,15 @@ export default function MePage() {
       }
     });
   }, [dayDetail, photoUrls, loadingPhoto, loadPhoto]);
+
+  useEffect(() => {
+    if (!modalUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModalUrl(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalUrl]);
 
   const monthLabel = formatMonthLabel(cursor);
   const maxKcal = Math.max(1, ...(stats?.days.map((d) => d.total_kcal) ?? [1]));
@@ -895,6 +920,10 @@ export default function MePage() {
                             <button
                               type="button"
                               onClick={() => {
+                                const original = m.note ?? "";
+                                if (noteDraft.trim() !== original.trim()) {
+                                  if (!window.confirm("작성 중인 메모를 버릴까요?")) return;
+                                }
                                 setNoteEditing(null);
                                 setNoteDraft("");
                               }}

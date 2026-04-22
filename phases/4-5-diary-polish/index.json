@@ -1,0 +1,12 @@
+{
+  "phase": "4-5-diary-polish",
+  "status": "in_progress",
+  "goal": "Phase 4 이후 발견된 UX 거친 부분 마감: ESC/외곽 닫기, AI 추정 힌트, 메모 초안 보호, 서명 URL 갱신, 실패 복구 경로",
+  "steps": [
+    { "name": "modal-esc-keys", "desc": "사진 모달·수동 추가 모달에 ESC 키 닫기" },
+    { "name": "ai-estimate-hint", "desc": "AI 추정 kcal 결과에 '추정치·수정 가능' 힌트" },
+    { "name": "note-draft-guard", "desc": "메모 초안 있을 때 취소·뒤로가기 시 확인" },
+    { "name": "signed-url-refresh", "desc": "갤러리 signed URL 만료(10분) 시 자동 갱신" },
+    { "name": "failure-retry", "desc": "분석·저장 실패 토스트에 재시도 버튼" }
+  ]
+}

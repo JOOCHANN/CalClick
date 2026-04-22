@@ -359,7 +359,7 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [manualQuery, manualOpen, runManualSearch]);
 
-  const resetManual = () => {
+  const resetManual = useCallback(() => {
     setManualQuery("");
     setManualResults([]);
     setManualSelected(null);
@@ -367,7 +367,19 @@ export default function Home() {
     setManualCustom(false);
     setCustomName("");
     setCustomKcal100("");
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!manualOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setManualOpen(false);
+        resetManual();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [manualOpen, resetManual]);
 
   const estimateCustomKcal = async () => {
     const name = customName.trim();
@@ -380,7 +392,9 @@ export default function Home() {
         body: JSON.stringify({ name }),
       });
       if (!res.ok) {
-        toast.error("추천 실패");
+        toast.error("추천 실패", {
+          action: { label: "재시도", onClick: () => void estimateCustomKcal() },
+        });
         return;
       }
       const { kcal_per_100g } = (await res.json()) as { kcal_per_100g: number };
@@ -425,7 +439,9 @@ export default function Home() {
         }),
       });
       if (!res.ok) {
-        toast.error("저장 실패");
+        toast.error("저장 실패", {
+          action: { label: "재시도", onClick: () => void saveManualMeal() },
+        });
         return;
       }
       toast.success("추가됨");
@@ -1195,6 +1211,9 @@ export default function Home() {
                       kcal
                     </span>
                   </div>
+                  <span className="text-[10px] text-ink-500 pl-0.5">
+                    AI 추정치는 오차가 있을 수 있어요. 직접 수정해도 돼요 ✏️
+                  </span>
                 </label>
               </div>
             )}
