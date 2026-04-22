@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("meals")
     .select(
-      "id, eaten_at, meal_type, total_kcal, share_count, photo_path, meal_items(id, grams, kcal, name, source, food_id, emoji, foods(official_name, kcal_per_100g, carb_g, protein_g, fat_g, source))",
+      "id, eaten_at, meal_type, total_kcal, share_count, photo_path, note, meal_items(id, grams, kcal, name, source, food_id, emoji, foods(official_name, kcal_per_100g, carb_g, protein_g, fat_g, source))",
     )
     .gte("eaten_at", from)
     .lt("eaten_at", to)
@@ -43,6 +43,7 @@ export async function GET(request: Request) {
     total_kcal: r.total_kcal,
     share_count: r.share_count,
     has_photo: !!r.photo_path,
+    note: (r as { note?: string | null }).note ?? null,
     items: (r.meal_items ?? []).map((it) => {
       const fRaw = it.foods as unknown as FoodRow | FoodRow[] | null;
       const f = Array.isArray(fRaw) ? fRaw[0] ?? null : fRaw;

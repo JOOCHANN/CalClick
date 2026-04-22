@@ -30,6 +30,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 const PatchSchema = z.object({
   total_kcal: z.number().nonnegative().max(20000).optional(),
   meal_type: z.enum(["breakfast", "lunch", "dinner", "snack"]).optional(),
+  note: z.string().max(500).nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

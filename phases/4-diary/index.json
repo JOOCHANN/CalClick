@@ -1,6 +1,12 @@
 {
   "project": "CalClick",
   "phase": "diary",
-  "description": "날짜별 식단, 끼니 분류(아침/점심/저녁/간식), 사진 갤러리.",
-  "steps": []
+  "description": "날짜별 식단 다이어리. 끼니 그룹핑 · 메모 · 날짜 네비 · 사진 갤러리.",
+  "steps": [
+    { "step": 1, "name": "meal-grouping", "effort": "s", "desc": "선택한 날 식단을 아침/점심/저녁/간식별로 그룹핑하고 섹션별 kcal 합계" },
+    { "step": 2, "name": "meal-note", "effort": "s", "desc": "meals.note 컬럼 활용 — 식사별 한줄 메모 추가/편집" },
+    { "step": 3, "name": "date-navigation", "effort": "xs", "desc": "선택한 날짜의 이전/다음 날 chevron 버튼" },
+    { "step": 4, "name": "photo-gallery", "effort": "m", "desc": "월간 사진 전용 그리드 뷰 (달력과 토글)" }
+  ],
+  "gate": "끼니별 요약·메모·날짜 네비·사진 갤러리 동작"
 }

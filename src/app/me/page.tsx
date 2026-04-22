@@ -10,6 +10,9 @@ import {
   Info,
   Loader2,
   Share2,
+  Pencil,
+  LayoutGrid,
+  Image as ImageIcon,
 } from "lucide-react";
 import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
 
@@ -49,6 +52,7 @@ type DayMeal = {
   total_kcal: number;
   share_count: number;
   has_photo: boolean;
+  note: string | null;
   items: DayItem[];
 };
 type DayDetail = { total_kcal: number; meals: DayMeal[] };
@@ -59,6 +63,13 @@ const MEAL_LABELS: Record<MealType, string> = {
   dinner: "저녁",
   snack: "간식",
 };
+const MEAL_EMOJI: Record<MealType, string> = {
+  breakfast: "🌅",
+  lunch: "☀️",
+  dinner: "🌙",
+  snack: "🍪",
+};
+const MEAL_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 const MEAL_COLORS: Record<MealType, string> = {
   breakfast: "bg-cream-100 text-amber-700",
   lunch: "bg-mint-100 text-mint-600",
@@ -105,6 +116,14 @@ export default function MePage() {
   const [loadingPhoto, setLoadingPhoto] = useState<Record<string, boolean>>({});
   const [openDetail, setOpenDetail] = useState<Record<string, boolean>>({});
   const [modalUrl, setModalUrl] = useState<string | null>(null);
+  const [noteEditing, setNoteEditing] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [view, setView] = useState<"calendar" | "gallery">("calendar");
+  const [photos, setPhotos] = useState<
+    { meal_id: string; eaten_at: string; total_kcal: number; url: string }[]
+  >([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
 
   const loadPhoto = useCallback(async (mealId: string) => {
     setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
@@ -150,6 +169,27 @@ export default function MePage() {
       setWeekly(await res.json());
     })();
   }, []);
+
+  useEffect(() => {
+    if (view !== "gallery") return;
+    let cancelled = false;
+    void (async () => {
+      setLoadingPhotos(true);
+      try {
+        const res = await fetch(`/api/stats/photos?month=${formatMonthKey(cursor)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          photos: { meal_id: string; eaten_at: string; total_kcal: number; url: string }[];
+        };
+        if (!cancelled) setPhotos(data.photos);
+      } finally {
+        if (!cancelled) setLoadingPhotos(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view, cursor]);
 
   useEffect(() => {
     if (!selectedDate) {
@@ -305,6 +345,33 @@ export default function MePage() {
     URL.revokeObjectURL(url);
   }, [weekly, todayKey]);
 
+  const saveNote = async (mealId: string) => {
+    setNoteSaving(true);
+    try {
+      const value = noteDraft.trim();
+      const res = await fetch(`/api/meals/${mealId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: value.length === 0 ? null : value }),
+      });
+      if (!res.ok) return;
+      setDayDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              meals: prev.meals.map((m) =>
+                m.id === mealId ? { ...m, note: value.length === 0 ? null : value } : m,
+              ),
+            }
+          : prev,
+      );
+      setNoteEditing(null);
+      setNoteDraft("");
+    } finally {
+      setNoteSaving(false);
+    }
+  };
+
   const handleSelect = (date: string) => {
     setSelectedDate((prev) => (prev === date ? null : date));
   };
@@ -454,7 +521,75 @@ export default function MePage() {
         </section>
       )}
 
+      {/* 뷰 토글 */}
+      <div className="flex bg-white rounded-full p-1 ring-1 ring-brand-100/50 shadow-sm text-xs">
+        <button
+          type="button"
+          onClick={() => setView("calendar")}
+          className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full transition ${
+            view === "calendar"
+              ? "bg-brand-500 text-white font-bold shadow-sm"
+              : "text-ink-500"
+          }`}
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          달력
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("gallery")}
+          className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full transition ${
+            view === "gallery"
+              ? "bg-brand-500 text-white font-bold shadow-sm"
+              : "text-ink-500"
+          }`}
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
+          사진
+        </button>
+      </div>
+
+      {view === "gallery" && (
+        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-3 flex flex-col gap-2">
+          {loadingPhotos ? (
+            <div className="grid grid-cols-3 gap-1.5">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <span key={i} className="aspect-square rounded-xl bg-cream-100 animate-pulse" />
+              ))}
+            </div>
+          ) : photos.length === 0 ? (
+            <p className="text-center text-xs text-ink-500 py-10">
+              이번 달엔 사진 기록이 없어요 📷
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5">
+              {photos.map((p) => {
+                const d = new Date(p.eaten_at);
+                return (
+                  <button
+                    key={p.meal_id}
+                    type="button"
+                    onClick={() => setModalUrl(p.url)}
+                    className="relative aspect-square rounded-xl overflow-hidden ring-1 ring-brand-100/60 active:scale-[0.97] transition"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt="식사" className="w-full h-full object-cover" loading="lazy" />
+                    <span className="absolute bottom-1 right-1 text-[9px] font-bold text-white bg-black/50 rounded-md px-1.5 py-0.5 tabular-nums">
+                      {p.total_kcal}
+                    </span>
+                    <span className="absolute top-1 left-1 text-[9px] text-white bg-black/40 rounded-md px-1.5 py-0.5 tabular-nums">
+                      {d.getMonth() + 1}.{d.getDate()}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* 달력 */}
+      {view === "calendar" && (
       <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-2">
         <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center pb-1">
           {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
@@ -511,12 +646,49 @@ export default function MePage() {
           })}
         </div>
       </section>
+      )}
 
       {/* 선택한 날 상세 */}
-      {selectedDate && (
+      {view === "calendar" && selectedDate && (
         <section className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-base font-semibold">{formatDayLabel(selectedDate)}</h2>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const [y, m, d] = selectedDate.split("-").map(Number);
+                  const prev = new Date(y, m - 1, d - 1);
+                  const key = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(prev.getDate()).padStart(2, "0")}`;
+                  if (prev.getMonth() !== cursor.getMonth() || prev.getFullYear() !== cursor.getFullYear()) {
+                    setCursor(new Date(prev.getFullYear(), prev.getMonth(), 1));
+                  }
+                  setSelectedDate(key);
+                }}
+                className="p-1 rounded-full text-ink-500 hover:bg-brand-50 hover:text-brand-600"
+                aria-label="이전 날"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <h2 className="text-base font-semibold">{formatDayLabel(selectedDate)}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  const [y, m, d] = selectedDate.split("-").map(Number);
+                  const next = new Date(y, m - 1, d + 1);
+                  const key = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+                  if (key > todayKey) return;
+                  if (next.getMonth() !== cursor.getMonth() || next.getFullYear() !== cursor.getFullYear()) {
+                    setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
+                  }
+                  setSelectedDate(key);
+                }}
+                disabled={selectedDate >= todayKey}
+                className="p-1 rounded-full text-ink-500 hover:bg-brand-50 hover:text-brand-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="다음 날"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
             <span className="text-sm text-brand-600 font-bold tabular-nums flex items-center gap-1 bg-brand-50 px-3 py-1 rounded-full">
               <Flame className="w-3.5 h-3.5" />
               {dayDetail?.total_kcal ?? 0} kcal
@@ -531,18 +703,47 @@ export default function MePage() {
               <span className="text-sm">기록된 식사가 없어요</span>
             </div>
           ) : (
-            <div className="relative flex flex-col gap-3 pl-6">
-              <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-neutral-200" aria-hidden />
-              {dayDetail.meals.map((m) => {
-                const d = new Date(m.eaten_at);
-                const time = `${String(d.getHours()).padStart(2, "0")}:${String(
-                  d.getMinutes(),
-                ).padStart(2, "0")}`;
-                const mealLabel = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
-                const mealColor = m.meal_type ? MEAL_COLORS[m.meal_type] : "bg-neutral-100 text-neutral-600";
-                return (
+            <div className="flex flex-col gap-5">
+              {(() => {
+                const groups = new Map<MealType, DayMeal[]>();
+                for (const m of dayDetail.meals) {
+                  const k = m.meal_type ?? "snack";
+                  const arr = groups.get(k) ?? [];
+                  arr.push(m);
+                  groups.set(k, arr);
+                }
+                for (const arr of groups.values()) {
+                  arr.sort((a, b) => a.eaten_at.localeCompare(b.eaten_at));
+                }
+                return MEAL_ORDER.filter((k) => groups.has(k)).map((k) => {
+                  const meals = groups.get(k)!;
+                  const sectionKcal = meals.reduce((s, x) => s + x.total_kcal, 0);
+                  return (
+                    <div key={k} className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">{MEAL_EMOJI[k]}</span>
+                          <span className="text-sm font-bold text-ink-900">
+                            {MEAL_LABELS[k]}
+                          </span>
+                          <span className="text-[10px] text-ink-500">· {meals.length}건</span>
+                        </div>
+                        <span className="text-xs font-bold tabular-nums text-brand-600">
+                          {sectionKcal} kcal
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {meals.map((m) => {
+                          const d = new Date(m.eaten_at);
+                          const time = `${String(d.getHours()).padStart(2, "0")}:${String(
+                            d.getMinutes(),
+                          ).padStart(2, "0")}`;
+                          const mealLabel = m.meal_type ? MEAL_LABELS[m.meal_type] : "식사";
+                          const mealColor = m.meal_type
+                            ? MEAL_COLORS[m.meal_type]
+                            : "bg-neutral-100 text-neutral-600";
+                          return (
                   <div key={m.id} className="relative">
-                    <span className="absolute -left-[18px] top-3 w-3 h-3 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 ring-4 ring-cream-50 shadow-[0_0_0_1px_rgba(255,138,149,0.2)]" />
                     <div className="rounded-2xl bg-white ring-1 ring-brand-100/50 shadow-[0_4px_16px_-8px_rgba(255,138,149,0.25)] p-4 flex flex-col gap-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
@@ -679,10 +880,72 @@ export default function MePage() {
                           )}
                         </div>
                       )}
+                      {noteEditing === m.id ? (
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <textarea
+                            value={noteDraft}
+                            onChange={(e) => setNoteDraft(e.target.value)}
+                            placeholder="이 식사에 대한 한줄 메모…"
+                            rows={2}
+                            maxLength={500}
+                            autoFocus
+                            className="w-full px-3 py-2 rounded-xl bg-cream-50 ring-1 ring-brand-200 focus:ring-brand-400 focus:outline-none text-sm resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNoteEditing(null);
+                                setNoteDraft("");
+                              }}
+                              className="flex-1 py-1.5 text-xs rounded-lg bg-cream-100 text-ink-500"
+                            >
+                              취소
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveNote(m.id)}
+                              disabled={noteSaving}
+                              className="flex-1 py-1.5 text-xs rounded-lg bg-brand-500 text-white font-medium disabled:opacity-50"
+                            >
+                              저장
+                            </button>
+                          </div>
+                        </div>
+                      ) : m.note ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteEditing(m.id);
+                            setNoteDraft(m.note ?? "");
+                          }}
+                          className="text-left text-xs text-ink-700 bg-cream-50 rounded-xl px-3 py-2 ring-1 ring-brand-100 hover:ring-brand-200 transition flex items-start gap-1.5"
+                        >
+                          <span className="text-sm shrink-0">✏️</span>
+                          <span className="whitespace-pre-wrap">{m.note}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoteEditing(m.id);
+                            setNoteDraft("");
+                          }}
+                          className="self-start text-[11px] text-ink-500 hover:text-brand-600 flex items-center gap-1 pt-0.5"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          메모 추가
+                        </button>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </section>
