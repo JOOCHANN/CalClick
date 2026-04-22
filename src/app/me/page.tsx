@@ -9,6 +9,7 @@ import {
   Calendar as CalendarIcon,
   Info,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { foodEmoji } from "@/lib/food-emoji";
 
@@ -185,6 +186,125 @@ export default function MePage() {
     return count;
   })();
 
+  const handleShare = useCallback(async () => {
+    if (!weekly) return;
+    const size = 1080;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const grad = ctx.createLinearGradient(0, 0, size, size);
+    grad.addColorStop(0, "#FF8A95");
+    grad.addColorStop(1, "#EE5363");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    ctx.arc(size - 120, 100, 180, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(80, size - 80, 160, 0, Math.PI * 2);
+    ctx.fill();
+
+    const font = `"Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif`;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = `600 36px ${font}`;
+    ctx.textAlign = "left";
+    ctx.fillText("CalClick · 이번 주 식단", 80, 140);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = `800 64px ${font}`;
+    const startDate = weekly.days[0]?.date ?? "";
+    const endDate = weekly.days[weekly.days.length - 1]?.date ?? "";
+    const fmt = (d: string) => {
+      const [, m, day] = d.split("-");
+      return `${Number(m)}.${Number(day)}`;
+    };
+    if (startDate && endDate) {
+      ctx.fillText(`${fmt(startDate)} - ${fmt(endDate)}`, 80, 220);
+    }
+
+    ctx.font = `500 32px ${font}`;
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillText("일 평균", 80, 320);
+    ctx.fillStyle = "#fff";
+    ctx.font = `900 160px ${font}`;
+    ctx.fillText(`${weekly.current_avg}`, 80, 470);
+    ctx.font = `500 40px ${font}`;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fillText("kcal", 80 + ctx.measureText(`${weekly.current_avg}`).width + 16, 470);
+
+    if (weekly.prev_avg > 0) {
+      const delta = weekly.current_avg - weekly.prev_avg;
+      const sign = delta >= 0 ? "+" : "";
+      ctx.font = `600 28px ${font}`;
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText(`지난주 대비 ${sign}${delta} kcal`, 80, 520);
+    }
+
+    const chartTop = 600;
+    const chartH = 280;
+    const chartW = size - 160;
+    const barGap = 16;
+    const barW = (chartW - barGap * 6) / 7;
+    const maxVal = Math.max(1, ...weekly.days.map((d) => d.total_kcal));
+    weekly.days.forEach((d, i) => {
+      const x = 80 + i * (barW + barGap);
+      const h = d.total_kcal === 0 ? 12 : (d.total_kcal / maxVal) * chartH;
+      const y = chartTop + chartH - h;
+      ctx.fillStyle = d.date === todayKey ? "#fff" : "rgba(255,255,255,0.55)";
+      const r = 14;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + barW - r, y);
+      ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+      ctx.lineTo(x + barW, chartTop + chartH);
+      ctx.lineTo(x, chartTop + chartH);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      ctx.fill();
+
+      const dow = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(d.date)];
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = `600 24px ${font}`;
+      ctx.textAlign = "center";
+      ctx.fillText(dow, x + barW / 2, chartTop + chartH + 42);
+      ctx.textAlign = "left";
+    });
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = `500 28px ${font}`;
+    ctx.fillText("calclick.app", size - 80, size - 60);
+    ctx.textAlign = "left";
+
+    const blob: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/png"));
+    if (!blob) return;
+    const file = new File([blob], "calclick-week.png", { type: "image/png" });
+    const nav = navigator as Navigator & {
+      canShare?: (d: ShareData) => boolean;
+      share?: (d: ShareData) => Promise<void>;
+    };
+    if (nav.canShare?.({ files: [file] }) && nav.share) {
+      try {
+        await nav.share({ files: [file], title: "CalClick 이번 주" });
+        return;
+      } catch {
+        // fallthrough to download
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "calclick-week.png";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [weekly, todayKey]);
+
   const handleSelect = (date: string) => {
     setSelectedDate((prev) => (prev === date ? null : date));
   };
@@ -252,22 +372,34 @@ export default function MePage() {
       {/* 주간 차트 */}
       {weekly && (
         <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">이번 주</h2>
-            {weekly.prev_avg > 0 && weekly.current_avg > 0 && (
-              <span className="text-[11px] text-ink-500">
-                지난주 대비{" "}
-                <span
-                  className={
-                    weekly.current_avg >= weekly.prev_avg
-                      ? "text-brand-600 font-bold"
-                      : "text-mint-600 font-bold"
-                  }
-                >
-                  {weekly.current_avg >= weekly.prev_avg ? "+" : ""}
-                  {weekly.current_avg - weekly.prev_avg} kcal
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold">이번 주</h2>
+              {weekly.prev_avg > 0 && weekly.current_avg > 0 && (
+                <span className="text-[11px] text-ink-500">
+                  지난주 대비{" "}
+                  <span
+                    className={
+                      weekly.current_avg >= weekly.prev_avg
+                        ? "text-brand-600 font-bold"
+                        : "text-mint-600 font-bold"
+                    }
+                  >
+                    {weekly.current_avg >= weekly.prev_avg ? "+" : ""}
+                    {weekly.current_avg - weekly.prev_avg} kcal
+                  </span>
                 </span>
-              </span>
+              )}
+            </div>
+            {weekly.current_avg > 0 && (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="text-[11px] text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-1 rounded-full bg-brand-50 ring-1 ring-brand-100"
+              >
+                <Share2 className="w-3 h-3" />
+                공유
+              </button>
             )}
           </div>
           <div className="flex items-end justify-between gap-1.5 h-28">
