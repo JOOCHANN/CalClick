@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { Camera, Loader2, Pencil, Trash2, Check, X, Plus, Search } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,6 +94,19 @@ export default function Home() {
   const [mealTypeDraft, setMealTypeDraft] = useState<MealType | null>(null);
   const [savingMeal, setSavingMeal] = useState(false);
   const [burst, setBurst] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualResults, setManualResults] = useState<
+    { food_id: string; official_name: string; kcal_per_100g: number }[]
+  >([]);
+  const [manualSearching, setManualSearching] = useState(false);
+  const [manualSelected, setManualSelected] = useState<{
+    food_id: string;
+    official_name: string;
+    kcal_per_100g: number;
+  } | null>(null);
+  const [manualGrams, setManualGrams] = useState(200);
+  const [manualSaving, setManualSaving] = useState(false);
   const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
@@ -352,6 +365,73 @@ export default function Home() {
     setItems(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
+  };
+
+  const runManualSearch = useCallback(async (q: string) => {
+    if (q.trim().length < 1) {
+      setManualResults([]);
+      return;
+    }
+    setManualSearching(true);
+    try {
+      const res = await fetch(`/api/foods/search?q=${encodeURIComponent(q.trim())}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        results: { food_id: string; official_name: string; kcal_per_100g: number }[];
+      };
+      setManualResults(data.results);
+    } finally {
+      setManualSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (manualOpen) void runManualSearch(manualQuery);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [manualQuery, manualOpen, runManualSearch]);
+
+  const resetManual = () => {
+    setManualQuery("");
+    setManualResults([]);
+    setManualSelected(null);
+    setManualGrams(200);
+  };
+
+  const saveManualMeal = async () => {
+    if (!manualSelected) return;
+    setManualSaving(true);
+    try {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidates: [
+            {
+              name: manualSelected.official_name,
+              grams: manualGrams,
+              kcalPer100g: manualSelected.kcal_per_100g,
+              source: "db",
+            },
+          ],
+          mealType,
+          shareCount: 1,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("저장 실패");
+        return;
+      }
+      toast.success("추가됨");
+      setManualOpen(false);
+      resetManual();
+      setBurst(true);
+      setTimeout(() => setBurst(false), 1200);
+      void fetchToday();
+    } finally {
+      setManualSaving(false);
+    }
   };
 
   const onAnalyze = async () => {
@@ -800,6 +880,14 @@ export default function Home() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "분석"}
           </Button>
         </div>
+        <button
+          type="button"
+          onClick={() => setManualOpen(true)}
+          className="text-xs text-ink-500 hover:text-brand-600 flex items-center justify-center gap-1 py-1"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          사진 없이 수동으로 추가
+        </button>
       </div>
 
       {loading && (
@@ -991,6 +1079,103 @@ export default function Home() {
               {e}
             </span>
           ))}
+        </div>
+      )}
+
+      {manualOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => {
+            setManualOpen(false);
+            resetManual();
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 flex flex-col gap-3 max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base">음식 직접 추가</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualOpen(false);
+                  resetManual();
+                }}
+                className="p-1 text-ink-500 hover:text-ink-900"
+                aria-label="닫기"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
+              <input
+                type="text"
+                value={manualQuery}
+                onChange={(e) => setManualQuery(e.target.value)}
+                placeholder="예: 김치찌개, 바나나, 아메리카노"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto flex flex-col gap-1 min-h-[120px]">
+              {manualSearching && manualResults.length === 0 ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-4 h-4 animate-spin text-ink-500" />
+                </div>
+              ) : manualResults.length === 0 ? (
+                <p className="text-center text-xs text-ink-500 py-6">
+                  {manualQuery.trim() ? "검색 결과가 없어요" : "음식을 검색해 보세요"}
+                </p>
+              ) : (
+                manualResults.map((r) => {
+                  const selected = manualSelected?.food_id === r.food_id;
+                  return (
+                    <button
+                      key={r.food_id}
+                      type="button"
+                      onClick={() => setManualSelected(r)}
+                      className={`text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 transition ${
+                        selected
+                          ? "bg-brand-50 ring-1 ring-brand-400"
+                          : "hover:bg-cream-50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-base">{foodEmoji(r.official_name)}</span>
+                        <span className="truncate text-sm">{r.official_name}</span>
+                      </span>
+                      <span className="text-[11px] text-ink-500 tabular-nums shrink-0">
+                        {Math.round(r.kcal_per_100g)} kcal/100g
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            {manualSelected && (
+              <div className="flex flex-col gap-2 pt-2 border-t border-brand-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">중량</span>
+                  <span className="text-sm font-bold tabular-nums text-brand-600">
+                    {manualGrams}g ·{" "}
+                    {Math.round((manualSelected.kcal_per_100g * manualGrams) / 100)} kcal
+                  </span>
+                </div>
+                <Slider
+                  value={[manualGrams]}
+                  min={50}
+                  max={800}
+                  step={10}
+                  onValueChange={(v) => setManualGrams(Array.isArray(v) ? v[0] : v)}
+                />
+                <Button onClick={saveManualMeal} disabled={manualSaving} className="mt-1">
+                  {manualSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "추가"}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </main>
