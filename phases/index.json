@@ -5,6 +5,7 @@
     { "dir": "1-minimal-app", "name": "minimal-app", "status": "completed", "gate": "Cloudflare Workers + AI Gateway 경유로 분석 성공, 배포 URL 도달 가능" },
     { "dir": "2-auth-persistence", "name": "auth-persistence", "status": "pending", "gate": "RLS isolates users, today kcal persists" },
     { "dir": "3-multi-food", "name": "multi-food", "status": "pending", "gate": "share-split UX works, 한상차림 인식 동작 확인" },
+    { "dir": "3-5-ux-polish", "name": "ux-polish", "status": "in_progress", "gate": "리텐션·바이럴 번들 (Undo/수동추가/주간뷰/공유카드). Phase 4 진입 전 완료." },
     { "dir": "4-diary", "name": "diary", "status": "pending" },
     { "dir": "5-goals-stats", "name": "goals-stats", "status": "pending" },
     { "dir": "6-pwa-polish", "name": "pwa-polish", "status": "pending", "gate": "Lighthouse PWA >= 90, E2E < 10s" }

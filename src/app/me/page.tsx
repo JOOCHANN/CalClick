@@ -7,7 +7,6 @@ import {
   Utensils,
   Flame,
   Calendar as CalendarIcon,
-  ImageIcon,
   Info,
   Loader2,
 } from "lucide-react";
@@ -97,6 +96,7 @@ export default function MePage() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingPhoto, setLoadingPhoto] = useState<Record<string, boolean>>({});
   const [openDetail, setOpenDetail] = useState<Record<string, boolean>>({});
+  const [modalUrl, setModalUrl] = useState<string | null>(null);
 
   const loadPhoto = useCallback(async (mealId: string) => {
     setLoadingPhoto((prev) => ({ ...prev, [mealId]: true }));
@@ -143,6 +143,15 @@ export default function MePage() {
     }
     void loadDay(selectedDate);
   }, [selectedDate, loadDay]);
+
+  useEffect(() => {
+    if (!dayDetail) return;
+    dayDetail.meals.forEach((m) => {
+      if (m.has_photo && !photoUrls[m.id] && !loadingPhoto[m.id]) {
+        void loadPhoto(m.id);
+      }
+    });
+  }, [dayDetail, photoUrls, loadingPhoto, loadPhoto]);
 
   const monthLabel = formatMonthLabel(cursor);
   const maxKcal = Math.max(1, ...(stats?.days.map((d) => d.total_kcal) ?? [1]));
@@ -235,6 +244,13 @@ export default function MePage() {
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
+          {!stats &&
+            Array.from({ length: 35 }).map((_, i) => (
+              <span
+                key={`sk-${i}`}
+                className="aspect-square rounded-2xl bg-cream-100 animate-pulse"
+              />
+            ))}
           {Array.from({ length: firstDow }).map((_, i) => (
             <span key={`pad-${i}`} />
           ))}
@@ -423,26 +439,23 @@ export default function MePage() {
                       {m.has_photo && (
                         <div className="pt-1">
                           {photoUrls[m.id] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={photoUrls[m.id]}
-                              alt="식사 사진"
-                              className="w-full rounded-lg object-cover max-h-60"
-                            />
-                          ) : (
                             <button
                               type="button"
-                              onClick={() => loadPhoto(m.id)}
-                              disabled={loadingPhoto[m.id]}
-                              className="w-full flex items-center justify-center gap-1.5 text-xs text-neutral-500 bg-neutral-50 hover:bg-neutral-100 rounded-lg py-2 disabled:opacity-60"
+                              onClick={() => setModalUrl(photoUrls[m.id])}
+                              className="w-full aspect-video rounded-xl overflow-hidden ring-1 ring-brand-100 active:scale-[0.98] transition"
                             >
-                              {loadingPhoto[m.id] ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <ImageIcon className="w-3.5 h-3.5" />
-                              )}
-                              {loadingPhoto[m.id] ? "불러오는 중…" : "사진 보기"}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photoUrls[m.id]}
+                                alt="식사 사진"
+                                className="w-full h-full object-cover"
+                              />
                             </button>
+                          ) : (
+                            <div className="w-full aspect-video rounded-xl bg-cream-100 flex items-center justify-center gap-1.5 text-xs text-ink-500 animate-pulse">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              사진 불러오는 중…
+                            </div>
                           )}
                         </div>
                       )}
@@ -453,6 +466,22 @@ export default function MePage() {
             </div>
           )}
         </section>
+      )}
+
+      {modalUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setModalUrl(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={modalUrl}
+            alt="식사 사진"
+            className="max-w-full max-h-full rounded-2xl shadow-2xl"
+          />
+        </div>
       )}
     </main>
   );

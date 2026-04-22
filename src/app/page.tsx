@@ -91,7 +91,9 @@ export default function Home() {
   const [itemDrafts, setItemDrafts] = useState<
     Record<string, { name: string; grams: string; kcal: string; emoji: string }>
   >({});
+  const [mealTypeDraft, setMealTypeDraft] = useState<MealType | null>(null);
   const [savingMeal, setSavingMeal] = useState(false);
+  const [burst, setBurst] = useState(false);
   const todayLabel = formatToday();
 
   const fetchToday = useCallback(async () => {
@@ -105,15 +107,35 @@ export default function Home() {
     setTodayMeals(data.meals ?? []);
   }, []);
 
-  const onDeleteMeal = async (id: string) => {
-    if (!confirm("이 식사를 삭제할까요?")) return;
-    const res = await fetch(`/api/meals/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("삭제 실패");
-      return;
-    }
-    toast.success("삭제됨");
-    fetchToday();
+  const onDeleteMeal = (m: TodayMeal) => {
+    const prevMeals = todayMeals;
+    const prevKcal = todayKcal;
+    setTodayMeals((list) => list.filter((x) => x.id !== m.id));
+    setTodayKcal((k) => Math.max(0, k - m.total_kcal));
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      const res = await fetch(`/api/meals/${m.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("삭제 실패");
+        void fetchToday();
+      }
+    }, 5000);
+
+    toast("삭제됨 🗑️", {
+      description: "5초 내 되돌릴 수 있어요",
+      duration: 5000,
+      action: {
+        label: "되돌리기",
+        onClick: () => {
+          cancelled = true;
+          clearTimeout(timer);
+          setTodayMeals(prevMeals);
+          setTodayKcal(prevKcal);
+        },
+      },
+    });
   };
 
   const saveEdit = async (id: string) => {
@@ -161,6 +183,7 @@ export default function Home() {
       };
     });
     setItemDrafts(drafts);
+    setMealTypeDraft(m.meal_type ?? "snack");
     setEditModeMealId(m.id);
     setExpandedId(m.id);
   };
@@ -168,6 +191,7 @@ export default function Home() {
   const exitMealEdit = () => {
     setEditModeMealId(null);
     setItemDrafts({});
+    setMealTypeDraft(null);
   };
 
   const saveMealEdits = async (m: TodayMeal) => {
@@ -190,19 +214,28 @@ export default function Home() {
         })
         .filter((x): x is { id: string; body: Record<string, string | number> } => x !== null);
 
-      if (patches.length === 0) {
+      const mealTypeChanged = mealTypeDraft && mealTypeDraft !== m.meal_type;
+      if (patches.length === 0 && !mealTypeChanged) {
         exitMealEdit();
         return;
       }
-      const results = await Promise.all(
-        patches.map((p) =>
-          fetch(`/api/meal-items/${p.id}`, {
+      const requests: Promise<Response>[] = patches.map((p) =>
+        fetch(`/api/meal-items/${p.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(p.body),
+        }),
+      );
+      if (mealTypeChanged) {
+        requests.push(
+          fetch(`/api/meals/${m.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(p.body),
+            body: JSON.stringify({ meal_type: mealTypeDraft }),
           }),
-        ),
-      );
+        );
+      }
+      const results = await Promise.all(requests);
       if (results.some((r) => !r.ok)) {
         toast.error("일부 항목 수정 실패");
       } else {
@@ -304,6 +337,8 @@ export default function Home() {
       const prefix = `${MEAL_LABELS[mealType]} +${data.total_kcal} kcal 저장됨`;
       const base = shareCount > 1 ? `${prefix} (${shareCount}명 공유)` : prefix;
       toast.success(base);
+      setBurst(true);
+      setTimeout(() => setBurst(false), 1200);
       fetchToday();
     } finally {
       setSaving(false);
@@ -459,6 +494,16 @@ export default function Home() {
         )}
       </section>
 
+      {todayMeals.length === 0 && !items && !loading && (
+        <section className="flex flex-col items-center gap-2 py-6 px-6 rounded-3xl bg-white ring-1 ring-brand-100/60 shadow-[0_4px_16px_-8px_rgba(255,138,149,0.15)]">
+          <div className="text-5xl" aria-hidden>🍽️</div>
+          <p className="text-sm font-semibold text-ink-900">오늘 첫 끼를 찍어볼까요?</p>
+          <p className="text-xs text-ink-500 text-center">
+            사진 한 장이면 돼요. 귀엽게 기록하고 오늘을 채워봐요 💕
+          </p>
+        </section>
+      )}
+
       {todayMeals.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium text-neutral-700 px-1">오늘 먹은 것</h2>
@@ -538,7 +583,7 @@ export default function Home() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDeleteMeal(m.id);
+                        onDeleteMeal(m);
                       }}
                       aria-label="삭제"
                       className="text-neutral-300 hover:text-red-500"
@@ -600,6 +645,28 @@ export default function Home() {
                     {m.share_count > 1 && (
                       <div className="text-xs text-neutral-500">{m.share_count}인 공유</div>
                     )}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10px] text-neutral-500 font-medium px-1">끼니</span>
+                      <div className="flex gap-1.5">
+                        {(["breakfast", "lunch", "dinner", "snack"] as const).map((t) => {
+                          const selected = (mealTypeDraft ?? m.meal_type) === t;
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setMealTypeDraft(t)}
+                              className={`flex-1 text-xs py-1.5 rounded-full transition active:scale-95 ${
+                                selected
+                                  ? "bg-brand-500 text-white shadow-md"
+                                  : "bg-white text-ink-700 ring-1 ring-neutral-200 hover:ring-brand-300"
+                              }`}
+                            >
+                              {MEAL_LABELS[t]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="grid grid-cols-[1fr_70px_80px] gap-2 text-[10px] text-neutral-500 font-medium px-1">
                       <span>이름</span>
                       <span className="text-right">그램</span>
@@ -909,6 +976,23 @@ export default function Home() {
       )}
 
       <Toaster position="top-center" />
+      {burst && (
+        <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+          {["💖", "✨", "🌸", "💕", "⭐️", "🫧"].map((e, i) => (
+            <span
+              key={i}
+              className="absolute text-3xl animate-[floatUp_1.2s_ease-out_forwards]"
+              style={{
+                left: `${45 + (i - 2.5) * 10}%`,
+                top: "55%",
+                animationDelay: `${i * 60}ms`,
+              }}
+            >
+              {e}
+            </span>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

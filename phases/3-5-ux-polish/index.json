@@ -1,0 +1,27 @@
+{
+  "project": "CalClick",
+  "phase": "ux-polish",
+  "description": "Phase 4 진입 전 UX/리텐션 개선 번들. 10-30대 여성 타겟에 맞춘 다꾸 감성, 빠른 입력 플로우, 실수 복구, 공유 동기부여.",
+  "rationale": "Phase 3까지 핵심 기능은 동작. 이대로 Phase 4(diary)로 넘어가면 '기능은 되는데 안 쓰고 싶은 앱'이 됨. 빈 상태·스켈레톤·Undo·수동 추가·주간 뷰·공유 카드가 리텐션·바이럴에 직접 기여.",
+  "gate": {
+    "empty_states": "홈/마이 첫 진입에 일러스트+카피, 로딩은 스켈레톤",
+    "fast_undo": "식사/아이템 삭제는 Sonner Undo 토스트(5초)로 복구 가능",
+    "meal_type_editable": "끼니 타입(아침/점심/저녁/간식) 수정 모드에서 변경 가능",
+    "save_feedback": "저장 성공 시 마이크로 인터랙션(하트/스파클 0.5초)",
+    "manual_add": "카메라 없이 음식 검색 → 중량 입력 → 저장",
+    "thumbnail_prefetch": "마이페이지 일 상세에 썸네일 자동 노출, 탭 시 풀 사이즈 모달",
+    "weekly_view": "마이페이지 주간 막대그래프 + 이번주 vs 지난주 비교",
+    "weekly_share": "주간 요약 1:1 이미지 카드 (인스타 스토리용)"
+  },
+  "steps": [
+    { "step": 1, "name": "delete-undo",       "status": "pending", "effort": "xs", "summary": "Sonner action 토스트로 5초 Undo. 낙관적 UI 되돌리기." },
+    { "step": 2, "name": "meal-type-edit",    "status": "pending", "effort": "s",  "summary": "수정 모드에 아침/점심/저녁/간식 토글 추가. PATCH /api/meals/[id] 에 meal_type 필드." },
+    { "step": 3, "name": "save-animation",    "status": "pending", "effort": "s",  "summary": "저장 성공 시 하트/스파클 버스트. framer-motion 가볍게 도입." },
+    { "step": 4, "name": "empty-states",      "status": "pending", "effort": "s",  "summary": "홈(오늘 기록 없음)·마이(월 기록 없음)·인식 로딩 일러스트 + 따뜻한 카피." },
+    { "step": 5, "name": "loading-skeletons", "status": "pending", "effort": "s",  "summary": "홈 목표 링/오늘 먹은 것, 마이 달력/일 상세 스켈레톤 (이미 shadcn Skeleton 있음)." },
+    { "step": 6, "name": "thumbnail-prefetch","status": "pending", "effort": "m",  "summary": "마이페이지 일 상세에 썸네일 자동 표시(일괄 signed URL). 탭 시 풀 사이즈 모달." },
+    { "step": 7, "name": "weekly-chart",      "status": "pending", "effort": "m",  "summary": "마이페이지 주간 막대그래프 + 이번주/지난주 평균 kcal 비교 카드. Recharts." },
+    { "step": 8, "name": "manual-add",        "status": "pending", "effort": "l",  "summary": "/api/foods/search (식약처 DB) + 수동 추가 모달 (검색 → 중량 → 끼니 → 저장)." },
+    { "step": 9, "name": "weekly-share",      "status": "pending", "effort": "l",  "summary": "주간 요약 1:1 OG 이미지 (satori). 공유 버튼 → 네이티브 share sheet." }
+  ]
+}
