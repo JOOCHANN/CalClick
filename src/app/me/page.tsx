@@ -13,6 +13,12 @@ import {
 import { foodEmoji } from "@/lib/food-emoji";
 
 type Day = { date: string; total_kcal: number };
+type Weekly = {
+  days: Day[];
+  prev_days: Day[];
+  current_avg: number;
+  prev_avg: number;
+};
 type Stats = {
   month: string;
   days: Day[];
@@ -90,6 +96,7 @@ export default function MePage() {
 
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [stats, setStats] = useState<Stats | null>(null);
+  const [weekly, setWeekly] = useState<Weekly | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -134,6 +141,14 @@ export default function MePage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch(`/api/stats/weekly`);
+      if (!res.ok) return;
+      setWeekly(await res.json());
+    })();
+  }, []);
 
   useEffect(() => {
     if (!selectedDate) {
@@ -233,6 +248,79 @@ export default function MePage() {
           </div>
         </div>
       </section>
+
+      {/* 주간 차트 */}
+      {weekly && (
+        <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold">이번 주</h2>
+            {weekly.prev_avg > 0 && weekly.current_avg > 0 && (
+              <span className="text-[11px] text-ink-500">
+                지난주 대비{" "}
+                <span
+                  className={
+                    weekly.current_avg >= weekly.prev_avg
+                      ? "text-brand-600 font-bold"
+                      : "text-mint-600 font-bold"
+                  }
+                >
+                  {weekly.current_avg >= weekly.prev_avg ? "+" : ""}
+                  {weekly.current_avg - weekly.prev_avg} kcal
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-end justify-between gap-1.5 h-28">
+            {weekly.days.map((d, i) => {
+              const max = Math.max(1, ...weekly.days.map((x) => x.total_kcal));
+              const pct = (d.total_kcal / max) * 100;
+              const isToday = d.date === todayKey;
+              const dow = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(d.date)];
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  onClick={() => {
+                    const [y, m] = d.date.split("-").map(Number);
+                    setCursor(new Date(y, m - 1, 1));
+                    setSelectedDate(d.date);
+                  }}
+                  className="flex-1 flex flex-col items-center gap-1 group"
+                >
+                  <span className="text-[9px] tabular-nums text-ink-500 h-3">
+                    {d.total_kcal > 0 ? d.total_kcal : ""}
+                  </span>
+                  <div className="w-full flex-1 flex items-end">
+                    <div
+                      className={`w-full rounded-t-lg transition group-hover:opacity-80 ${
+                        d.total_kcal === 0
+                          ? "bg-cream-100"
+                          : isToday
+                            ? "bg-gradient-to-t from-brand-600 to-brand-400"
+                            : "bg-brand-200"
+                      }`}
+                      style={{ height: `${Math.max(d.total_kcal === 0 ? 6 : 12, pct)}%` }}
+                    />
+                  </div>
+                  <span
+                    className={`text-[10px] font-medium ${
+                      isToday
+                        ? "text-brand-600"
+                        : i === 0 || dow === "일"
+                          ? "text-brand-400"
+                          : dow === "토"
+                            ? "text-mint-600"
+                            : "text-ink-500"
+                    }`}
+                  >
+                    {dow}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* 달력 */}
       <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-2">
