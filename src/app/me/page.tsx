@@ -119,7 +119,9 @@ export default function MePage() {
   const todayKey = toDateKey(today);
 
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
-  const [calendarView, setCalendarView] = useState<"month" | "week" | "graph">("month");
+  const [range, setRange] = useState<"month" | "week">("month");
+  const [viewMode, setViewMode] = useState<"calendar" | "graph">("calendar");
+  const [chartType, setChartType] = useState<"bar" | "line">("bar");
   const [weekStart, setWeekStart] = useState<Date>(() => weekStartOf(todayKey));
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
@@ -178,6 +180,19 @@ export default function MePage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadStats();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, [loadStats]);
 
   const loadWeights = useCallback(async () => {
@@ -429,15 +444,15 @@ export default function MePage() {
         </div>
       </section>
 
-      {/* 달력 (월/주/그래프 토글) */}
+      {/* 달력 / 그래프 */}
       <section className="rounded-3xl bg-white shadow-[0_8px_24px_-12px_rgba(255,138,149,0.2)] ring-1 ring-brand-100/50 p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-xs">
             <button
               type="button"
-              onClick={() => setCalendarView("month")}
+              onClick={() => setRange("month")}
               className={`px-3 py-1 rounded-full transition ${
-                calendarView === "month"
+                range === "month"
                   ? "bg-brand-500 text-white font-bold shadow-sm"
                   : "text-ink-500"
               }`}
@@ -448,66 +463,82 @@ export default function MePage() {
               type="button"
               onClick={() => {
                 if (selectedDate) setWeekStart(weekStartOf(selectedDate));
-                setCalendarView("week");
+                setRange("week");
               }}
               className={`px-3 py-1 rounded-full transition ${
-                calendarView === "week"
+                range === "week"
                   ? "bg-brand-500 text-white font-bold shadow-sm"
                   : "text-ink-500"
               }`}
             >
               주
             </button>
+          </div>
+          <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-xs">
             <button
               type="button"
-              onClick={() => setCalendarView("graph")}
+              onClick={() => setViewMode("calendar")}
               className={`px-3 py-1 rounded-full transition ${
-                calendarView === "graph"
+                viewMode === "calendar"
                   ? "bg-brand-500 text-white font-bold shadow-sm"
                   : "text-ink-500"
               }`}
+              aria-label="달력 보기"
+            >
+              달력
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("graph")}
+              className={`px-3 py-1 rounded-full transition ${
+                viewMode === "graph"
+                  ? "bg-brand-500 text-white font-bold shadow-sm"
+                  : "text-ink-500"
+              }`}
+              aria-label="그래프 보기"
             >
               그래프
             </button>
           </div>
-          {calendarView === "week" && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const prev = new Date(weekStart);
-                  prev.setDate(weekStart.getDate() - 7);
-                  setWeekStart(prev);
-                }}
-                className="p-1 rounded-full text-ink-500 hover:bg-brand-50"
-                aria-label="이전 주"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-xs tabular-nums text-ink-700">{weekRangeLabel}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = new Date(weekStart);
-                  next.setDate(weekStart.getDate() + 7);
-                  if (toDateKey(next) > todayKey) return;
-                  setWeekStart(next);
-                }}
-                disabled={(() => {
-                  const next = new Date(weekStart);
-                  next.setDate(weekStart.getDate() + 7);
-                  return toDateKey(next) > todayKey;
-                })()}
-                className="p-1 rounded-full text-ink-500 hover:bg-brand-50 disabled:opacity-30"
-                aria-label="다음 주"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
 
-        {calendarView !== "graph" && (
+        {range === "week" && (
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const prev = new Date(weekStart);
+                prev.setDate(weekStart.getDate() - 7);
+                setWeekStart(prev);
+              }}
+              className="p-1 rounded-full text-ink-500 hover:bg-brand-50"
+              aria-label="이전 주"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs tabular-nums text-ink-700">{weekRangeLabel}</span>
+            <button
+              type="button"
+              onClick={() => {
+                const next = new Date(weekStart);
+                next.setDate(weekStart.getDate() + 7);
+                if (toDateKey(next) > todayKey) return;
+                setWeekStart(next);
+              }}
+              disabled={(() => {
+                const next = new Date(weekStart);
+                next.setDate(weekStart.getDate() + 7);
+                return toDateKey(next) > todayKey;
+              })()}
+              className="p-1 rounded-full text-ink-500 hover:bg-brand-50 disabled:opacity-30"
+              aria-label="다음 주"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {viewMode === "calendar" && (
           <div className="grid grid-cols-7 gap-1 text-[10px] font-medium text-neutral-400 text-center">
             {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
               <span key={d} className={i === 0 ? "text-brand-400" : i === 6 ? "text-mint-600" : ""}>
@@ -517,7 +548,7 @@ export default function MePage() {
           </div>
         )}
 
-        {calendarView === "month" ? (
+        {viewMode === "calendar" && range === "month" ? (
           <div className="grid grid-cols-7 gap-1">
             {!stats &&
               Array.from({ length: 35 }).map((_, i) => (
@@ -552,13 +583,18 @@ export default function MePage() {
                     isSelected
                       ? "ring-2 ring-brand-600 scale-105 shadow-md"
                       : isToday
-                        ? "ring-1 ring-brand-500"
+                        ? "ring-2 ring-brand-500 ring-offset-1 ring-offset-white shadow-[0_0_0_2px_rgba(255,138,149,0.15)]"
                         : "hover:ring-1 hover:ring-brand-200"
                   }`}
                 >
                   <span className="absolute top-1 left-1.5 text-[8px] tabular-nums opacity-55 leading-none">
                     {day}
                   </span>
+                  {isToday && (
+                    <span className="absolute top-0.5 right-1 text-[7px] font-bold text-brand-600 bg-white rounded px-1 leading-tight shadow-sm">
+                      오늘
+                    </span>
+                  )}
                   {has ? (
                     <span className="flex items-baseline gap-0.5 leading-none">
                       <span className="text-[11px] font-bold tabular-nums">{d.total_kcal}</span>
@@ -577,7 +613,7 @@ export default function MePage() {
               );
             })}
           </div>
-        ) : calendarView === "week" ? (
+        ) : viewMode === "calendar" && range === "week" ? (
           <div className="grid grid-cols-7 gap-1">
             {weekDays.map((d) => {
               const weekMax = Math.max(1, ...weekDays.map((x) => x.total_kcal));
@@ -613,13 +649,18 @@ export default function MePage() {
                     isSelected
                       ? "ring-2 ring-brand-600 scale-[1.03] shadow-md"
                       : isToday
-                        ? "ring-1 ring-brand-500"
+                        ? "ring-2 ring-brand-500 ring-offset-1 ring-offset-white shadow-[0_0_0_2px_rgba(255,138,149,0.15)]"
                         : "hover:ring-1 hover:ring-brand-200"
                   }`}
                 >
                   <span className="absolute top-1 left-1.5 text-[9px] opacity-55 leading-none tabular-nums">
                     {Number(mm)}/{Number(dd)}
                   </span>
+                  {isToday && (
+                    <span className="absolute top-0.5 right-1 text-[8px] font-bold text-brand-600 bg-white rounded px-1 leading-tight shadow-sm">
+                      오늘
+                    </span>
+                  )}
                   {has ? (
                     <span className="flex items-baseline gap-0.5 leading-none mt-1">
                       <span className="text-sm font-bold tabular-nums">{d.total_kcal}</span>
@@ -640,22 +681,9 @@ export default function MePage() {
           </div>
         ) : (
           (() => {
-            const months = monthly?.months ?? [];
-            const monthlyWeight = new Map<string, number>();
-            for (const m of months) {
-              const [y, mm] = m.month.split("-").map(Number);
-              const start = new Date(y, mm - 1, 1);
-              const end = new Date(y, mm, 0);
-              const inMonth = weightLogs.filter(
-                (l) => l.logged_on >= toDateKey(start) && l.logged_on <= toDateKey(end),
-              );
-              if (inMonth.length > 0) {
-                const avg = inMonth.reduce((s, x) => s + x.weight_kg, 0) / inMonth.length;
-                monthlyWeight.set(m.month, Math.round(avg * 10) / 10);
-              }
-            }
-            const hasAnyKcal = months.some((m) => m.avg_kcal > 0);
-            const hasAnyWeight = monthlyWeight.size > 0;
+            const series: Day[] = range === "month" ? stats?.days ?? [] : weekDays;
+            const hasAnyKcal = series.some((d) => d.total_kcal > 0);
+            const hasAnyWeight = series.some((d) => weightByDate.has(d.date));
             if (!hasAnyKcal && !hasAnyWeight) {
               return (
                 <p className="text-center text-xs text-ink-500 py-10">
@@ -664,138 +692,214 @@ export default function MePage() {
               );
             }
             const goal = profile?.goal_kcal ?? 0;
-            const kcalMax = Math.max(goal, ...months.map((m) => m.avg_kcal), 1);
-            const weightVals = Array.from(monthlyWeight.values());
+            const kcalMax = Math.max(goal, ...series.map((d) => d.total_kcal), 1);
+            const weightSeries = series.map((d) => weightByDate.get(d.date) ?? null);
+            const weightVals = weightSeries.filter((v): v is number => v !== null);
             const wMin = weightVals.length > 0 ? Math.min(...weightVals) : 0;
             const wMax = weightVals.length > 0 ? Math.max(...weightVals) : 1;
             const wRange = Math.max(0.5, wMax - wMin);
-            const chartH = 140;
-            const w = 300;
-            const padL = 4;
-            const padR = 4;
-            const bw = (w - padL - padR) / months.length;
-            const wxy = months
-              .map((m, i) => {
-                const v = monthlyWeight.get(m.month);
-                if (v == null) return null;
-                const x = padL + bw * (i + 0.5);
-                const y = chartH - ((v - wMin) / wRange) * (chartH - 20) - 10;
-                return { x, y, v, month: m.month };
-              })
-              .filter((p): p is { x: number; y: number; v: number; month: string } => p !== null);
-            const linePts = wxy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+            const chartH = 160;
+            const w = 320;
+            const padL = 8;
+            const padR = 8;
+            const innerW = w - padL - padR;
+            const n = series.length;
+            const slot = innerW / n;
+            const centerX = (i: number) => padL + slot * (i + 0.5);
+            const yKcal = (v: number) => chartH - (v / kcalMax) * (chartH - 16) - 4;
+            const yW = (v: number) =>
+              chartH - ((v - wMin) / wRange) * (chartH - 30) - 15;
+
+            const kcalLinePts = series
+              .map((d, i) => `${centerX(i).toFixed(1)},${yKcal(d.total_kcal).toFixed(1)}`)
+              .join(" ");
+            const kcalAreaPts =
+              `${padL},${chartH} ` +
+              kcalLinePts +
+              ` ${padL + innerW},${chartH}`;
+            const wxy = weightSeries
+              .map((v, i) => (v != null ? { x: centerX(i), y: yW(v), v, idx: i } : null))
+              .filter((p): p is { x: number; y: number; v: number; idx: number } => p !== null);
+            const wLinePts = wxy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
             return (
               <div className="flex flex-col gap-3 pt-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="flex items-center gap-1.5 text-ink-500">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-brand-600 to-brand-400" />
-                    칼로리 (일 평균)
-                  </span>
-                  <span className="flex items-center gap-1.5 text-ink-500">
-                    <span className="w-3 h-0.5 bg-mint-600" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-mint-600 -ml-1" />
-                    체중 (월 평균)
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 text-[11px] text-ink-500">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-brand-600 to-brand-400" />
+                      칼로리
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-0.5 bg-mint-600 rounded-full" />
+                      체중
+                    </span>
+                  </div>
+                  <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setChartType("bar")}
+                      className={`px-2.5 py-0.5 rounded-full transition ${
+                        chartType === "bar"
+                          ? "bg-white text-brand-600 font-bold shadow-sm"
+                          : "text-ink-500"
+                      }`}
+                    >
+                      막대
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartType("line")}
+                      className={`px-2.5 py-0.5 rounded-full transition ${
+                        chartType === "line"
+                          ? "bg-white text-brand-600 font-bold shadow-sm"
+                          : "text-ink-500"
+                      }`}
+                    >
+                      선
+                    </button>
+                  </div>
                 </div>
-                <div className="relative">
-                  <svg
-                    viewBox={`0 0 ${w} ${chartH}`}
-                    className="w-full h-36"
-                    preserveAspectRatio="none"
-                  >
-                    {goal > 0 && (
-                      <line
-                        x1={0}
-                        x2={w}
-                        y1={chartH - (goal / kcalMax) * chartH}
-                        y2={chartH - (goal / kcalMax) * chartH}
-                        stroke="#FFB8C0"
-                        strokeWidth="1"
-                        strokeDasharray="3 3"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-                    {months.map((m, i) => {
-                      const h =
-                        m.avg_kcal === 0 ? 2 : Math.max(8, (m.avg_kcal / kcalMax) * chartH);
-                      const x = padL + bw * i + bw * 0.2;
-                      const bwInner = bw * 0.6;
-                      const y = chartH - h;
-                      const over = goal > 0 && m.avg_kcal > goal;
-                      return (
-                        <rect
-                          key={m.month}
-                          x={x}
-                          y={y}
-                          width={bwInner}
-                          height={h}
-                          rx={4}
-                          fill={
-                            m.avg_kcal === 0
-                              ? "#FFF5F2"
-                              : over
-                                ? "url(#barOver)"
-                                : "url(#barNorm)"
-                          }
+
+                <svg
+                  viewBox={`0 0 ${w} ${chartH}`}
+                  className="w-full h-40"
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <linearGradient id="barNorm" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0" stopColor="#FFB8C0" />
+                      <stop offset="1" stopColor="#FFD1D8" />
+                    </linearGradient>
+                    <linearGradient id="barOver" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0" stopColor="#EE5363" />
+                      <stop offset="1" stopColor="#FF8A95" />
+                    </linearGradient>
+                    <linearGradient id="kcalArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stopColor="#FF8A95" stopOpacity="0.35" />
+                      <stop offset="1" stopColor="#FF8A95" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {goal > 0 && (
+                    <line
+                      x1={padL}
+                      x2={padL + innerW}
+                      y1={yKcal(goal)}
+                      y2={yKcal(goal)}
+                      stroke="#FFB8C0"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {chartType === "bar"
+                    ? series.map((d, i) => {
+                        const h =
+                          d.total_kcal === 0
+                            ? 2
+                            : Math.max(6, (d.total_kcal / kcalMax) * (chartH - 16));
+                        const bw = slot * 0.62;
+                        const x = centerX(i) - bw / 2;
+                        const y = chartH - h - 4;
+                        const over = goal > 0 && d.total_kcal > goal;
+                        const isToday = d.date === todayKey;
+                        return (
+                          <rect
+                            key={d.date}
+                            x={x}
+                            y={y}
+                            width={bw}
+                            height={h}
+                            rx={3}
+                            fill={
+                              d.total_kcal === 0
+                                ? "#FFF5F2"
+                                : over
+                                  ? "url(#barOver)"
+                                  : "url(#barNorm)"
+                            }
+                            stroke={isToday ? "#EE5363" : undefined}
+                            strokeWidth={isToday ? 1.5 : 0}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        );
+                      })
+                    : (
+                      <>
+                        <polygon points={kcalAreaPts} fill="url(#kcalArea)" />
+                        <polyline
+                          points={kcalLinePts}
+                          fill="none"
+                          stroke="#EE5363"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          vectorEffect="non-scaling-stroke"
                         />
-                      );
-                    })}
-                    {linePts && (
-                      <polyline
-                        points={linePts}
-                        fill="none"
-                        stroke="#4CAF8A"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        vectorEffect="non-scaling-stroke"
-                      />
+                        {series.map((d, i) => (
+                          <circle
+                            key={d.date}
+                            cx={centerX(i)}
+                            cy={yKcal(d.total_kcal)}
+                            r={d.date === todayKey ? 3 : 2}
+                            fill="#fff"
+                            stroke="#EE5363"
+                            strokeWidth="1.5"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        ))}
+                      </>
                     )}
-                    {wxy.map((p) => (
-                      <circle
-                        key={p.month}
-                        cx={p.x}
-                        cy={p.y}
-                        r={3}
-                        fill="#fff"
-                        stroke="#4CAF8A"
-                        strokeWidth="1.5"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ))}
-                    <defs>
-                      <linearGradient id="barNorm" x1="0" y1="1" x2="0" y2="0">
-                        <stop offset="0" stopColor="#FFB8C0" />
-                        <stop offset="1" stopColor="#FFD1D8" />
-                      </linearGradient>
-                      <linearGradient id="barOver" x1="0" y1="1" x2="0" y2="0">
-                        <stop offset="0" stopColor="#EE5363" />
-                        <stop offset="1" stopColor="#FF8A95" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
-                <div className="flex justify-between text-[10px] text-ink-500 tabular-nums -mt-1">
-                  {months.map((m) => {
-                    const [, mm] = m.month.split("-");
-                    const kcal = m.avg_kcal > 0 ? m.avg_kcal : null;
-                    const wv = monthlyWeight.get(m.month);
+                  {wLinePts && (
+                    <polyline
+                      points={wLinePts}
+                      fill="none"
+                      stroke="#4CAF8A"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {wxy.map((p) => (
+                    <circle
+                      key={p.idx}
+                      cx={p.x}
+                      cy={p.y}
+                      r={series[p.idx].date === todayKey ? 3.5 : 2.5}
+                      fill="#fff"
+                      stroke="#4CAF8A"
+                      strokeWidth="1.5"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                </svg>
+
+                <div className="flex justify-between text-[9px] text-ink-500 tabular-nums px-1">
+                  {series.map((d, i) => {
+                    const [, mm, dd] = d.date.split("-");
+                    const isToday = d.date === todayKey;
+                    const show =
+                      range === "week" ||
+                      i === 0 ||
+                      i === series.length - 1 ||
+                      Number(dd) % 5 === 0 ||
+                      isToday;
                     return (
-                      <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5">
-                        <span className="font-medium text-ink-700">{Number(mm)}월</span>
-                        {kcal != null && (
-                          <span className="text-brand-600 font-bold">{kcal} kcal</span>
-                        )}
-                        {wv != null && (
-                          <span className="text-mint-600 font-bold">{wv} kg</span>
-                        )}
-                      </div>
+                      <span
+                        key={d.date}
+                        className={`flex-1 text-center ${isToday ? "text-brand-600 font-bold" : ""}`}
+                      >
+                        {show ? (range === "week" ? `${Number(mm)}/${Number(dd)}` : Number(dd)) : ""}
+                      </span>
                     );
                   })}
                 </div>
+
                 {goal > 0 && (
                   <p className="text-[10px] text-ink-500 text-right -mt-1">
-                    목표 {goal} kcal · 점선 기준
+                    목표 {goal} kcal (점선)
                   </p>
                 )}
               </div>
@@ -818,7 +922,7 @@ export default function MePage() {
                   if (prev.getMonth() !== cursor.getMonth() || prev.getFullYear() !== cursor.getFullYear()) {
                     setCursor(new Date(prev.getFullYear(), prev.getMonth(), 1));
                   }
-                  if (calendarView === "week") setWeekStart(weekStartOf(key));
+                  if (range === "week") setWeekStart(weekStartOf(key));
                   setSelectedDate(key);
                 }}
                 className="p-1 rounded-full text-ink-500 hover:bg-brand-50 hover:text-brand-600"
@@ -837,7 +941,7 @@ export default function MePage() {
                   if (next.getMonth() !== cursor.getMonth() || next.getFullYear() !== cursor.getFullYear()) {
                     setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
                   }
-                  if (calendarView === "week") setWeekStart(weekStartOf(key));
+                  if (range === "week") setWeekStart(weekStartOf(key));
                   setSelectedDate(key);
                 }}
                 disabled={selectedDate >= todayKey}
