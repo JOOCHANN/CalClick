@@ -1,7 +1,20 @@
 {
   "project": "CalClick",
   "phase": "pwa-polish",
-  "description": "Service Worker 오프라인 촬영 큐잉, 아이콘/splash, Lighthouse ≥ 90, Playwright E2E.",
-  "gate": { "lighthouse_pwa": ">= 90", "e2e_capture_to_save": "< 10s" },
-  "steps": []
+  "description": "설치 가능한 PWA로 전환 · iOS/Android 홈화면 추가 동작 · 기본 SW + offline fallback · 스모크 E2E.",
+  "goal_line": "앱스토어 없이도 '앱처럼' 설치되고 뜬다.",
+  "gate": "홈화면 설치 시 스탠드얼론으로 정상 로드 · Lighthouse PWA installability 통과 · 촬영→저장 E2E < 10s",
+  "steps": [
+    { "name": "step1-manifest-icons", "desc": "manifest.webmanifest 정리 + 192/512/maskable 아이콘 + apple-touch-icon" },
+    { "name": "step2-service-worker", "desc": "public/sw.js 수동 작성 · 정적 SWR · /api는 네트워크 · /offline fallback" },
+    { "name": "step3-ios-standalone", "desc": "apple-mobile-web-app-capable · safe-area padding · 홈 추가 유도 배너" },
+    { "name": "step4-smoke-e2e", "desc": "Playwright 1 spec: 로그인→촬영→저장 < 10s" },
+    { "name": "step5-perf-a11y", "desc": "next/image 교체 · prefetch 조정 · aria-label 보완" }
+  ],
+  "deferred": [
+    "오프라인 촬영 큐잉 (IndexedDB + Background Sync)",
+    "푸시 알림",
+    "E2E CI 통합",
+    "iOS splash 이미지 세트 (해상도별)"
+  ]
 }
