@@ -121,7 +121,6 @@ export default function MePage() {
   const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [range, setRange] = useState<"month" | "week">("month");
   const [viewMode, setViewMode] = useState<"calendar" | "graph">("calendar");
-  const [chartType, setChartType] = useState<"bar" | "line">("bar");
   const [weekStart, setWeekStart] = useState<Date>(() => weekStartOf(todayKey));
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
@@ -686,197 +685,226 @@ export default function MePage() {
             const hasAnyWeight = series.some((d) => weightByDate.has(d.date));
             if (!hasAnyKcal && !hasAnyWeight) {
               return (
-                <p className="text-center text-xs text-ink-500 py-10">
-                  아직 기록이 쌓이면 여기에 그래프가 나타나요 📈
-                </p>
+                <div className="flex flex-col items-center gap-2 py-12 text-ink-500">
+                  <span className="text-2xl">📈</span>
+                  <span className="text-xs">기록이 쌓이면 여기에 예쁜 그래프가 나타나요</span>
+                </div>
               );
             }
             const goal = profile?.goal_kcal ?? 0;
-            const kcalMax = Math.max(goal, ...series.map((d) => d.total_kcal), 1);
+            const kcalMax = Math.max(goal * 1.1, ...series.map((d) => d.total_kcal) , 1);
             const weightSeries = series.map((d) => weightByDate.get(d.date) ?? null);
             const weightVals = weightSeries.filter((v): v is number => v !== null);
             const wMin = weightVals.length > 0 ? Math.min(...weightVals) : 0;
             const wMax = weightVals.length > 0 ? Math.max(...weightVals) : 1;
             const wRange = Math.max(0.5, wMax - wMin);
 
-            const chartH = 160;
-            const w = 320;
-            const padL = 8;
-            const padR = 8;
+            const chartH = 180;
+            const w = 340;
+            const padL = 12;
+            const padR = 12;
+            const padT = 18;
+            const padB = 24;
+            const plotH = chartH - padT - padB;
             const innerW = w - padL - padR;
             const n = series.length;
             const slot = innerW / n;
             const centerX = (i: number) => padL + slot * (i + 0.5);
-            const yKcal = (v: number) => chartH - (v / kcalMax) * (chartH - 16) - 4;
+            const yKcal = (v: number) => padT + plotH - (v / kcalMax) * plotH;
             const yW = (v: number) =>
-              chartH - ((v - wMin) / wRange) * (chartH - 30) - 15;
+              padT + plotH - ((v - wMin) / wRange) * plotH * 0.7 - plotH * 0.15;
 
-            const kcalLinePts = series
-              .map((d, i) => `${centerX(i).toFixed(1)},${yKcal(d.total_kcal).toFixed(1)}`)
-              .join(" ");
-            const kcalAreaPts =
-              `${padL},${chartH} ` +
-              kcalLinePts +
-              ` ${padL + innerW},${chartH}`;
             const wxy = weightSeries
               .map((v, i) => (v != null ? { x: centerX(i), y: yW(v), v, idx: i } : null))
               .filter((p): p is { x: number; y: number; v: number; idx: number } => p !== null);
-            const wLinePts = wxy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+            const smoothPath = (() => {
+              if (wxy.length < 2) return null;
+              let path = `M ${wxy[0].x.toFixed(1)} ${wxy[0].y.toFixed(1)}`;
+              for (let i = 1; i < wxy.length; i++) {
+                const p0 = wxy[i - 1];
+                const p1 = wxy[i];
+                const cx = (p0.x + p1.x) / 2;
+                path += ` Q ${cx.toFixed(1)} ${p0.y.toFixed(1)} ${cx.toFixed(1)} ${((p0.y + p1.y) / 2).toFixed(1)}`;
+                path += ` T ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+              }
+              return path;
+            })();
+
+            const todayIdx = series.findIndex((d) => d.date === todayKey);
+            const activeKcal = series.filter((d) => d.total_kcal > 0);
+            const avgKcal =
+              activeKcal.length > 0
+                ? Math.round(activeKcal.reduce((s, x) => s + x.total_kcal, 0) / activeKcal.length)
+                : 0;
 
             return (
               <div className="flex flex-col gap-3 pt-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3 text-[11px] text-ink-500">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-t from-brand-600 to-brand-400" />
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-ink-500">
+                      <span className="w-2 h-2 rounded-full bg-brand-400" />
                       칼로리
+                      {avgKcal > 0 && (
+                        <span className="text-ink-700 font-semibold tabular-nums ml-0.5">
+                          평균 {avgKcal}
+                        </span>
+                      )}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-0.5 bg-mint-600 rounded-full" />
+                    <span className="flex items-center gap-1.5 text-ink-500">
+                      <span className="w-2 h-2 rounded-full bg-mint-500" />
                       체중
                     </span>
                   </div>
-                  <div className="flex bg-cream-50 rounded-full p-0.5 ring-1 ring-brand-100/50 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setChartType("bar")}
-                      className={`px-2.5 py-0.5 rounded-full transition ${
-                        chartType === "bar"
-                          ? "bg-white text-brand-600 font-bold shadow-sm"
-                          : "text-ink-500"
-                      }`}
-                    >
-                      막대
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setChartType("line")}
-                      className={`px-2.5 py-0.5 rounded-full transition ${
-                        chartType === "line"
-                          ? "bg-white text-brand-600 font-bold shadow-sm"
-                          : "text-ink-500"
-                      }`}
-                    >
-                      선
-                    </button>
-                  </div>
+                  {goal > 0 && (
+                    <span className="text-[10px] text-ink-500">
+                      목표 <span className="text-brand-600 font-bold tabular-nums">{goal}</span>
+                    </span>
+                  )}
                 </div>
 
-                <svg
-                  viewBox={`0 0 ${w} ${chartH}`}
-                  className="w-full h-40"
-                  preserveAspectRatio="none"
-                >
-                  <defs>
-                    <linearGradient id="barNorm" x1="0" y1="1" x2="0" y2="0">
-                      <stop offset="0" stopColor="#FFB8C0" />
-                      <stop offset="1" stopColor="#FFD1D8" />
-                    </linearGradient>
-                    <linearGradient id="barOver" x1="0" y1="1" x2="0" y2="0">
-                      <stop offset="0" stopColor="#EE5363" />
-                      <stop offset="1" stopColor="#FF8A95" />
-                    </linearGradient>
-                    <linearGradient id="kcalArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stopColor="#FF8A95" stopOpacity="0.35" />
-                      <stop offset="1" stopColor="#FF8A95" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {goal > 0 && (
-                    <line
-                      x1={padL}
-                      x2={padL + innerW}
-                      y1={yKcal(goal)}
-                      y2={yKcal(goal)}
-                      stroke="#FFB8C0"
-                      strokeWidth="1"
-                      strokeDasharray="3 3"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
-                  {chartType === "bar"
-                    ? series.map((d, i) => {
-                        const h =
-                          d.total_kcal === 0
-                            ? 2
-                            : Math.max(6, (d.total_kcal / kcalMax) * (chartH - 16));
-                        const bw = slot * 0.62;
-                        const x = centerX(i) - bw / 2;
-                        const y = chartH - h - 4;
-                        const over = goal > 0 && d.total_kcal > goal;
-                        const isToday = d.date === todayKey;
-                        return (
-                          <rect
-                            key={d.date}
-                            x={x}
-                            y={y}
-                            width={bw}
-                            height={h}
-                            rx={3}
-                            fill={
-                              d.total_kcal === 0
-                                ? "#FFF5F2"
-                                : over
-                                  ? "url(#barOver)"
-                                  : "url(#barNorm)"
-                            }
-                            stroke={isToday ? "#EE5363" : undefined}
-                            strokeWidth={isToday ? 1.5 : 0}
-                            vectorEffect="non-scaling-stroke"
-                          />
-                        );
-                      })
-                    : (
-                      <>
-                        <polygon points={kcalAreaPts} fill="url(#kcalArea)" />
-                        <polyline
-                          points={kcalLinePts}
-                          fill="none"
-                          stroke="#EE5363"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          vectorEffect="non-scaling-stroke"
+                <div className="relative rounded-2xl bg-gradient-to-b from-cream-50/60 to-white px-1 py-2">
+                  <svg
+                    viewBox={`0 0 ${w} ${chartH}`}
+                    className="w-full h-44"
+                    preserveAspectRatio="none"
+                  >
+                    <defs>
+                      <linearGradient id="barBody" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0" stopColor="#FFC4CB" />
+                        <stop offset="1" stopColor="#FF8A95" />
+                      </linearGradient>
+                      <linearGradient id="barBodyOver" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0" stopColor="#FF8A95" />
+                        <stop offset="1" stopColor="#EE5363" />
+                      </linearGradient>
+                      <linearGradient id="barToday" x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0" stopColor="#FFA8B2" />
+                        <stop offset="1" stopColor="#EE5363" />
+                      </linearGradient>
+                    </defs>
+
+                    {[0.25, 0.5, 0.75].map((f) => (
+                      <line
+                        key={f}
+                        x1={padL}
+                        x2={padL + innerW}
+                        y1={padT + plotH * (1 - f)}
+                        y2={padT + plotH * (1 - f)}
+                        stroke="#FFE6E8"
+                        strokeWidth="1"
+                        strokeDasharray="1 4"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+
+                    {goal > 0 && (
+                      <line
+                        x1={padL}
+                        x2={padL + innerW}
+                        y1={yKcal(goal)}
+                        y2={yKcal(goal)}
+                        stroke="#FFB8C0"
+                        strokeWidth="1.2"
+                        strokeDasharray="4 3"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+
+                    {todayIdx >= 0 && (
+                      <rect
+                        x={centerX(todayIdx) - slot * 0.46}
+                        y={padT - 4}
+                        width={slot * 0.92}
+                        height={plotH + 8}
+                        rx={slot * 0.3}
+                        fill="#FFF0F2"
+                        opacity="0.7"
+                      />
+                    )}
+
+                    {series.map((d, i) => {
+                      if (d.total_kcal === 0) return null;
+                      const h = Math.max(4, (d.total_kcal / kcalMax) * plotH);
+                      const bw = Math.min(slot * 0.5, range === "week" ? 24 : 10);
+                      const x = centerX(i) - bw / 2;
+                      const y = padT + plotH - h;
+                      const over = goal > 0 && d.total_kcal > goal;
+                      const isToday = d.date === todayKey;
+                      return (
+                        <rect
+                          key={d.date}
+                          x={x}
+                          y={y}
+                          width={bw}
+                          height={h}
+                          rx={bw / 2}
+                          fill={
+                            isToday
+                              ? "url(#barToday)"
+                              : over
+                                ? "url(#barBodyOver)"
+                                : "url(#barBody)"
+                          }
                         />
-                        {series.map((d, i) => (
+                      );
+                    })}
+
+                    {smoothPath && (
+                      <path
+                        d={smoothPath}
+                        fill="none"
+                        stroke="#6ECBA5"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeOpacity="0.85"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {wxy.map((p) => {
+                      const isToday = series[p.idx].date === todayKey;
+                      return (
+                        <g key={p.idx}>
+                          <circle cx={p.x} cy={p.y} r={isToday ? 5 : 3.5} fill="#6ECBA5" opacity="0.18" />
                           <circle
-                            key={d.date}
-                            cx={centerX(i)}
-                            cy={yKcal(d.total_kcal)}
-                            r={d.date === todayKey ? 3 : 2}
+                            cx={p.x}
+                            cy={p.y}
+                            r={isToday ? 3 : 2.2}
                             fill="#fff"
-                            stroke="#EE5363"
+                            stroke="#4CAF8A"
                             strokeWidth="1.5"
                             vectorEffect="non-scaling-stroke"
                           />
-                        ))}
-                      </>
-                    )}
-                  {wLinePts && (
-                    <polyline
-                      points={wLinePts}
-                      fill="none"
-                      stroke="#4CAF8A"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
-                  {wxy.map((p) => (
-                    <circle
-                      key={p.idx}
-                      cx={p.x}
-                      cy={p.y}
-                      r={series[p.idx].date === todayKey ? 3.5 : 2.5}
-                      fill="#fff"
-                      stroke="#4CAF8A"
-                      strokeWidth="1.5"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </svg>
+                        </g>
+                      );
+                    })}
 
-                <div className="flex justify-between text-[9px] text-ink-500 tabular-nums px-1">
+                    {todayIdx >= 0 && (
+                      <g>
+                        <rect
+                          x={centerX(todayIdx) - 11}
+                          y={2}
+                          width={22}
+                          height={12}
+                          rx={6}
+                          fill="#EE5363"
+                        />
+                        <text
+                          x={centerX(todayIdx)}
+                          y={11}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fontWeight="700"
+                          fill="#fff"
+                        >
+                          오늘
+                        </text>
+                      </g>
+                    )}
+                  </svg>
+                </div>
+
+                <div className="flex justify-between text-[9px] text-ink-500 tabular-nums px-3">
                   {series.map((d, i) => {
                     const [, mm, dd] = d.date.split("-");
                     const isToday = d.date === todayKey;
@@ -896,12 +924,6 @@ export default function MePage() {
                     );
                   })}
                 </div>
-
-                {goal > 0 && (
-                  <p className="text-[10px] text-ink-500 text-right -mt-1">
-                    목표 {goal} kcal (점선)
-                  </p>
-                )}
               </div>
             );
           })()
