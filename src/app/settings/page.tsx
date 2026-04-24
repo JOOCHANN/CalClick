@@ -12,6 +12,9 @@ import {
   type Sex,
 } from "@/lib/calorie-targets";
 
+type AvatarEmoji = "🍚" | "🍜" | "🥗" | "🍳" | "🍎" | "🍱";
+const AVATAR_PRESETS: AvatarEmoji[] = ["🍚", "🍜", "🥗", "🍳", "🍎", "🍱"];
+
 type Profile = {
   nickname: string | null;
   sex: Sex | null;
@@ -23,6 +26,8 @@ type Profile = {
   goal_kcal: number | null;
   goal_auto: boolean;
   onboarded_at: string | null;
+  avatar_emoji: AvatarEmoji | null;
+  bio: string | null;
 };
 
 const ACTIVITY_LABEL: Record<ActivityLevel, string> = {
@@ -50,6 +55,10 @@ export default function SettingsPage() {
   const [goalKcal, setGoalKcal] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  const [avatarEmoji, setAvatarEmoji] = useState<AvatarEmoji>("🍚");
+  const [bio, setBio] = useState<string>("");
+  const [savingPublic, setSavingPublic] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -62,6 +71,8 @@ export default function SettingsPage() {
           setActivity(p.activity_level);
           setGoalAuto(p.goal_auto);
           setGoalKcal(p.goal_kcal ? String(p.goal_kcal) : "");
+          setAvatarEmoji(p.avatar_emoji ?? "🍚");
+          setBio(p.bio ?? "");
         }
       }
       if (!cancelled) setLoading(false);
@@ -124,6 +135,31 @@ export default function SettingsPage() {
     }
   };
 
+  const savePublic = async () => {
+    if (bio.length > 80) {
+      toast.error("소개글은 80자 이내로 입력해 주세요");
+      return;
+    }
+    setSavingPublic(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          avatar_emoji: avatarEmoji,
+          bio: bio.trim().length === 0 ? null : bio.trim(),
+        }),
+      });
+      if (!res.ok) {
+        toast.error("저장 실패");
+        return;
+      }
+      toast.success("저장됨");
+    } finally {
+      setSavingPublic(false);
+    }
+  };
+
   const onDelete = async () => {
     setDeleting(true);
     const res = await fetch("/api/account", { method: "DELETE" });
@@ -163,6 +199,66 @@ export default function SettingsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-ink-500" />
           </Link>
+
+          {profile?.nickname && (
+            <Link
+              href={`/u/${profile.nickname}`}
+              className="flex items-center justify-between rounded-2xl bg-white ring-1 ring-brand-100/60 p-4 hover:ring-brand-200 transition"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">{profile.avatar_emoji ?? "🍚"}</span>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-sm font-semibold">내 공개 프로필</span>
+                  <span className="text-xs text-ink-500 truncate">
+                    /u/{profile.nickname}
+                  </span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-ink-500" />
+            </Link>
+          )}
+
+          <section className="flex flex-col gap-3 rounded-2xl bg-white ring-1 ring-brand-100/60 p-4">
+            <h2 className="text-sm font-semibold">공개 프로필 꾸미기</h2>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-ink-500">아바타</span>
+              <div className="grid grid-cols-6 gap-1.5">
+                {AVATAR_PRESETS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setAvatarEmoji(e)}
+                    className={`aspect-square rounded-2xl flex items-center justify-center text-2xl transition ${
+                      avatarEmoji === e
+                        ? "bg-brand-500 ring-2 ring-brand-600 scale-105 shadow-sm"
+                        : "bg-cream-50 ring-1 ring-brand-100 hover:ring-brand-200"
+                    }`}
+                    aria-label={`아바타 ${e}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-ink-500">한 줄 소개</span>
+                <span className="text-[10px] text-ink-500 tabular-nums">
+                  {bio.length}/80
+                </span>
+              </div>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 80))}
+                placeholder="예: 단백질 챙기는 30대 직장인"
+                rows={2}
+                className="w-full px-3 py-2 rounded-xl bg-cream-50 ring-1 ring-brand-100 focus:ring-brand-400 focus:outline-none text-sm resize-none"
+              />
+            </div>
+            <Button onClick={savePublic} disabled={savingPublic}>
+              {savingPublic ? <Loader2 className="w-4 h-4 animate-spin" /> : "저장"}
+            </Button>
+          </section>
 
           <section className="flex flex-col gap-3 rounded-2xl bg-white ring-1 ring-brand-100/60 p-4">
             <div className="flex items-center justify-between">

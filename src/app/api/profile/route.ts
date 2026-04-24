@@ -27,10 +27,15 @@ const PatchSchema = z.object({
   goal_kcal: z.number().int().min(800).max(6000).nullable().optional(),
   goal_auto: z.boolean().optional(),
   finish_onboarding: z.boolean().optional(),
+  avatar_emoji: z
+    .enum(["🍚", "🍜", "🥗", "🍳", "🍎", "🍱"])
+    .nullable()
+    .optional(),
+  bio: z.string().max(80).nullable().optional(),
 });
 
 const PROFILE_COLS =
-  "nickname, nickname_changed_at, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at";
+  "nickname, nickname_changed_at, sex, birth_year, height_cm, current_weight_kg, activity_level, goal_kcal, goal_type, goal_auto, onboarded_at, privacy_accepted_at, avatar_emoji, bio";
 
 export async function GET() {
   const supabase = await supabaseServer();

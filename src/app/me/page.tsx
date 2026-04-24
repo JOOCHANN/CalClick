@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Pencil,
   Scale,
+  UserCircle,
 } from "lucide-react";
 import { foodEmoji, displayFoodName } from "@/lib/food-emoji";
 import { motivationLine } from "@/lib/motivation";
@@ -391,11 +393,30 @@ export default function MePage() {
             </p>
           </div>
         </div>
-        {streak > 0 && (
-          <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-brand-100 shrink-0">
-            🔥 {streak}일째
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {streak > 0 && (
+            <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full flex items-center gap-1 ring-1 ring-brand-100">
+              🔥 {streak}일째
+            </span>
+          )}
+          {profile?.nickname ? (
+            <Link
+              href={`/u/${profile.nickname}`}
+              className="text-[10px] font-semibold text-ink-500 hover:text-brand-600 flex items-center gap-1 px-2 py-0.5 rounded-full bg-cream-50 ring-1 ring-brand-100/60"
+            >
+              <UserCircle className="w-3 h-3" />
+              내 공개 프로필
+            </Link>
+          ) : (
+            <Link
+              href="/settings/nickname"
+              className="text-[10px] font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 ring-1 ring-brand-100"
+            >
+              <UserCircle className="w-3 h-3" />
+              닉네임 설정
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* 월 요약 카드 */}
