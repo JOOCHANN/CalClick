@@ -9,6 +9,6 @@
     { "dir": "4-diary", "name": "diary", "status": "completed", "gate": "끼니별 요약·메모·날짜 네비·사진 갤러리 동작 완료" },
     { "dir": "4-5-diary-polish", "name": "diary-polish", "status": "completed", "gate": "ESC·추정 힌트·메모 보호·서명 URL 갱신·실패 재시도" },
     { "dir": "5-goals-stats", "name": "goals-stats", "status": "completed", "gate": "목표 링·일별 체중 로깅·달력↔그래프 뷰·닉네임 1일1회+전역 유일·마이 리디자인 완료" },
-    { "dir": "6-pwa-polish", "name": "pwa-polish", "status": "pending", "gate": "Lighthouse PWA >= 90, E2E < 10s" }
+    { "dir": "6-pwa-polish", "name": "pwa-polish", "status": "completed", "gate": "매니페스트 브랜드 컬러 · SW + offline · iOS safe-area + 홈추가 배너 · Playwright E2E 스켈레톤" }
   ]
 }

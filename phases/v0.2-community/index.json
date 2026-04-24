@@ -1,0 +1,22 @@
+{
+  "project": "CalClick",
+  "version": "0.2",
+  "phase": "community",
+  "description": "혼자 기록 → 같이 기록. 한식·식약처 DB·공유식사 자산을 커뮤니티 UX로 확장.",
+  "goal_line": "식단 기록이 네트워크가 된다 — 같은 음식 먹은 사람과 비교하고, 친구와 챌린지를 같이 한다.",
+  "gate": "피드·좋아요·댓글·팔로우 작동 · 챌린지 1개 완주 가능 · 같은 음식 비교 카드 노출 · 신고·차단 1차 처리",
+  "sub_phases": [
+    { "name": "v0.2-a-social-foundation", "desc": "profiles 공개뷰 + follows + /u/[nickname]" },
+    { "name": "v0.2-b-feed", "desc": "posts/likes/comments + 피드 탭(팔로잉·발견) + 식사→공유 1탭" },
+    { "name": "v0.2-c-food-compare", "desc": "food_id 기반 평균·분포 View + 같은 음식 비교 카드" },
+    { "name": "v0.2-d-challenges", "desc": "challenges + participants + 3가지 규칙 + 리더보드(익명화)" },
+    { "name": "v0.2-e-notify-moderation", "desc": "Web Push + Moderation API + 신고/차단" }
+  ],
+  "deferred": [
+    "DM 1:1 메시징",
+    "그룹·소모임",
+    "유저 레시피 공유",
+    "인플루언서/전문가 프로그램",
+    "지역·나이대 필터"
+  ]
+}

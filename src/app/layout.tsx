@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { TabBarGate } from "@/components/TabBarGate";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { IOSInstallBanner } from "@/components/IOSInstallBanner";
 
 export const metadata: Metadata = {
   title: "CalClick — 한 번의 클릭, 오늘의 칼로리",
@@ -43,6 +45,8 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-cream-50 text-ink-900 pb-20">
         {children}
         <TabBarGate />
+        <ServiceWorkerRegister />
+        <IOSInstallBanner />
       </body>
     </html>
   );

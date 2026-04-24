@@ -1,65 +1,48 @@
 # CalClick
 
-한상차림 1장을 찍으면 국·밥·반찬을 각각 인식하고, 식약처·농진청 공식 DB에서 칼로리를 찾아, 공유 식사는 인원수로 나눠 계산하는 한국 식단 관리 PWA.
+한상차림 사진 한 장으로 국·밥·반찬을 각각 인식하고, 식약처 공식 DB로 칼로리를 계산해주는 한국형 식단 관리 PWA.
 
-## 🚀 지금 체험하기
+**🔗 Demo** · [calclick.green261535.workers.dev](https://calclick.green261535.workers.dev) — iOS Safari에서 공유 → "홈 화면에 추가"로 앱처럼 설치
 
-**데모 링크**: [https://calclick.green261535.workers.dev](https://calclick.green261535.workers.dev)
+---
 
-1. 이메일로 가입 (이메일 인증 없이 바로 사용 가능 — 데모용)
-2. 홈 화면에서 음식 사진 촬영/선택 → **분석**
-3. 상위 후보 중 하나 선택 → **오늘 식사에 저장**
-4. 상단 "오늘 섭취 kcal"에 반영
+## 📌 Versions
 
-> ⚠️ 데모 단계라 데이터는 예고 없이 초기화될 수 있습니다. 개인정보는 [설정 → 계정 삭제]에서 즉시 영구 삭제 가능.
+| 버전 | 상태 | 주제 | 문서 |
+|---|---|---|---|
+| **v0.1** | ✅ Released | PWA MVP — 한상차림 인식 · 식단일기 · 목표·통계 · PWA 설치 | [CHANGELOG](#v01--released) |
+| **v0.2** | 🛠 In Progress | 칼로리 관리 커뮤니티 — 피드 · 챌린지 · 같은 음식 비교 | [plan](phases/v0.2-community/plan.md) |
+| v0.3+ | 📅 Planned | DM · 그룹 · 레시피 공유 · 지역 인사이트 | — |
 
-## 스택
-Next.js 15 · Tailwind · shadcn/ui · Supabase · OpenAI GPT-4o Vision · Cloudflare Workers (via `@opennextjs/cloudflare`) · Cloudflare AI Gateway
+### v0.1 — Released
+- 📷 사진 → 다중 음식 자동 인식 (한상차림 대응)
+- 🧮 식약처·농진청 공식 DB 기반 칼로리·매크로
+- 👥 공유 식사 ÷ 인원수 토글
+- 📅 날짜별 식단 일기 · 끼니 분류 · 메모
+- 🎯 BMR/TDEE 목표 kcal · 체중 로그 · 월/주 트렌드 그래프
+- 📱 PWA 설치 가능 · 오프라인 폴백 · iOS safe-area
 
-## 개발
-```bash
-npm install
-npm run dev        # localhost:3000
-npm run lint
-npm test
-npm run build
-```
+### v0.2 — In Progress (커뮤니티)
+혼자 기록하는 앱 → 같이 기록하는 앱. 식약처 food_id 정규화 덕에 **"같은 메뉴 먹은 사람들 평균과 비교"** 같은 경쟁앱이 못 하는 기능이 가능.
 
-`.env.local` 필수 키 (`.env.example` 참고):
-- `OPENAI_API_KEY`, `OPENAI_BASE_URL` (AI Gateway `/compat` endpoint)
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] `v0.2-a` 소셜 기초 — 공개 프로필 · 팔로우
+- [ ] `v0.2-b` 피드 — 식사 공유 · 좋아요 · 댓글
+- [ ] `v0.2-c` 같은 음식 비교 — food_id 기반 평균·분포
+- [ ] `v0.2-d` 챌린지 — 규칙·리더보드(닉네임 한정)
+- [ ] `v0.2-e` 알림·모더레이션 — Web Push · 신고 · 차단
 
-## 배포 (Cloudflare)
-```bash
-npm run cf:build   # OpenNext 번들 + static 자산
-npm run cf:deploy  # wrangler deploy
-```
+자세한 플랜: [phases/v0.2-community/plan.md](phases/v0.2-community/plan.md)
 
-### 환경변수 이중 관리 (중요)
-Cloudflare는 빌드 시점과 런타임 시점이 분리돼 있어 **두 곳 모두** 값을 넣어야 함.
+---
 
-| 위치 | 용도 | 필요 변수 |
-|---|---|---|
-| **Build → Variables and secrets** | `next build`가 client JS 번들에 박음 (브라우저에서 사용) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| **Worker → Variables and Secrets** | Worker 런타임에서 server 코드가 `process.env`로 읽음 | 위 2개 + `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL` |
+## 🧱 Tech Stack
+Next.js 16 · TypeScript · Tailwind · shadcn/ui · Supabase (Auth/DB/Storage/RLS) · OpenAI GPT-4o Vision · Cloudflare Workers (OpenNext)
 
-Build 쪽만 넣고 Runtime이 비면 server 코드 500. Runtime만 넣고 Build가 비면 브라우저 Supabase 호출 hang.
+---
 
-### AI Gateway 엔드포인트 포맷
-`OPENAI_BASE_URL`은 **반드시 `/compat`까지만** 넣고 `/chat/completions`는 붙이지 않음:
-```
-https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat
-```
-OpenAI SDK가 `/chat/completions`를 자동으로 붙임. 두 번 붙으면 404.
-
-## 배포 전 체크
-[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) 참고.
-
-## Phase 진행
-- [x] Phase 0 — Core PoC (eval 스킵, GPT-4o 확정)
-- [x] Phase 1 — Minimal Web App
-- [x] Phase 2 — Auth + 영속화
-- [ ] Phase 3 — 한상차림 다중 음식 (차별점)
-- [ ] Phase 4 — Daily Diary
-- [ ] Phase 5 — Goals & Stats
-- [ ] Phase 6 — PWA Polish
+## 📖 Docs
+- [PRD](docs/PRD.md) — 제품 정의 · 차별점
+- [Architecture](docs/ARCHITECTURE.md) · [ADR](docs/ADR.md) · [UI Guide](docs/UI_GUIDE.md)
+- [Development](docs/DEVELOPMENT.md) — 로컬 실행 · 환경변수 · 규칙
+- [Deploy](docs/DEPLOY.md) — Cloudflare Workers 배포 가이드
+- [Privacy](docs/PRIVACY.md) · [Release Checklist](docs/RELEASE_CHECKLIST.md)
