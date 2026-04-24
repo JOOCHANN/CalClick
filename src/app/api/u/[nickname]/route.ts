@@ -5,6 +5,7 @@ type PublicProfile = {
   id: string;
   nickname: string;
   avatar_emoji: string | null;
+  avatar_url: string | null;
   bio: string | null;
 };
 type PublicStats = {
@@ -18,29 +19,36 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ nickname: string }> },
 ) {
-  const { nickname } = await params;
+  const { nickname: rawNick } = await params;
+  const nickname = decodeURIComponent(rawNick ?? "").trim();
   if (!nickname || nickname.length > 20) {
     return NextResponse.json({ error: "invalid_nickname" }, { status: 400 });
   }
 
   const supabase = await supabaseServer();
 
-  const { data: profile, error: profErr } = await supabase
-    .rpc("public_profile", { p_nickname: nickname })
-    .maybeSingle<PublicProfile>();
+  const { data: profRows, error: profErr } = await supabase.rpc("public_profile", {
+    p_nickname: nickname,
+  });
   if (profErr) {
     return NextResponse.json({ error: profErr.message }, { status: 500 });
   }
+  const profile: PublicProfile | null = Array.isArray(profRows)
+    ? (profRows[0] ?? null)
+    : (profRows as PublicProfile | null);
   if (!profile) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const { data: stats, error: statsErr } = await supabase
-    .rpc("public_stats", { p_user_id: profile.id })
-    .maybeSingle<PublicStats>();
+  const { data: statsRows, error: statsErr } = await supabase.rpc("public_stats", {
+    p_user_id: profile.id,
+  });
   if (statsErr) {
     return NextResponse.json({ error: statsErr.message }, { status: 500 });
   }
+  const stats: PublicStats | null = Array.isArray(statsRows)
+    ? (statsRows[0] ?? null)
+    : (statsRows as PublicStats | null);
 
   const {
     data: { user },
@@ -66,6 +74,7 @@ export async function GET(
       id: profile.id,
       nickname: profile.nickname,
       avatar_emoji: profile.avatar_emoji,
+      avatar_url: profile.avatar_url,
       bio: profile.bio,
     },
     stats: {

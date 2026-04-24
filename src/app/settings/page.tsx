@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ChevronRight, Loader2, Sparkles, Camera, Trash2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AvatarView } from "@/components/AvatarView";
+import { resizeImage } from "@/lib/image-resize";
 import {
   computeTargets,
   type ActivityLevel,
@@ -27,6 +29,7 @@ type Profile = {
   goal_auto: boolean;
   onboarded_at: string | null;
   avatar_emoji: AvatarEmoji | null;
+  avatar_url: string | null;
   bio: string | null;
 };
 
@@ -56,8 +59,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [avatarEmoji, setAvatarEmoji] = useState<AvatarEmoji>("🍚");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [bio, setBio] = useState<string>("");
   const [savingPublic, setSavingPublic] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +78,7 @@ export default function SettingsPage() {
           setGoalAuto(p.goal_auto);
           setGoalKcal(p.goal_kcal ? String(p.goal_kcal) : "");
           setAvatarEmoji(p.avatar_emoji ?? "🍚");
+          setAvatarUrl(p.avatar_url ?? null);
           setBio(p.bio ?? "");
         }
       }
@@ -132,6 +139,49 @@ export default function SettingsPage() {
       toast.success("저장됨");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onPickAvatar = () => fileInputRef.current?.click();
+
+  const onAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("JPG / PNG / WebP만 올릴 수 있어요");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const resized = await resizeImage(file).catch(() => file);
+      const fd = new FormData();
+      fd.append("image", resized, "avatar.jpg");
+      const res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
+      if (!res.ok) {
+        toast.error("업로드 실패");
+        return;
+      }
+      const data = (await res.json()) as { avatar_url: string };
+      setAvatarUrl(data.avatar_url);
+      toast.success("아바타 업데이트됨");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarUploading(true);
+    try {
+      const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("삭제 실패");
+        return;
+      }
+      setAvatarUrl(null);
+      toast.success("아바타 삭제됨");
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -206,13 +256,8 @@ export default function SettingsPage() {
               className="flex items-center justify-between rounded-2xl bg-white ring-1 ring-brand-100/60 p-4 hover:ring-brand-200 transition"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-2xl">{profile.avatar_emoji ?? "🍚"}</span>
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-sm font-semibold">내 공개 프로필</span>
-                  <span className="text-xs text-ink-500 truncate">
-                    /u/{profile.nickname}
-                  </span>
-                </div>
+                <AvatarView url={avatarUrl} emoji={avatarEmoji} size={40} />
+                <span className="text-sm font-semibold">내 공개 프로필</span>
               </div>
               <ChevronRight className="w-4 h-4 text-ink-500" />
             </Link>
@@ -220,8 +265,56 @@ export default function SettingsPage() {
 
           <section className="flex flex-col gap-3 rounded-2xl bg-white ring-1 ring-brand-100/60 p-4">
             <h2 className="text-sm font-semibold">공개 프로필 꾸미기</h2>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs text-ink-500">아바타 사진</span>
+              <div className="flex items-center gap-3">
+                <AvatarView
+                  url={avatarUrl}
+                  emoji={avatarEmoji}
+                  size={64}
+                  className="ring-1 ring-brand-100"
+                />
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <button
+                    type="button"
+                    onClick={onPickAvatar}
+                    disabled={avatarUploading}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold disabled:opacity-60"
+                  >
+                    {avatarUploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                    {avatarUrl ? "사진 변경" : "사진 올리기"}
+                  </button>
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={removeAvatar}
+                      disabled={avatarUploading}
+                      className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-cream-100 text-ink-500 text-[11px] disabled:opacity-60"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      사진 제거 (아바타로 복귀)
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={onAvatarFile}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-ink-500">아바타</span>
+              <span className="text-xs text-ink-500">
+                기본 아바타 {avatarUrl && <span className="text-[10px]">(사진 제거 시 표시)</span>}
+              </span>
               <div className="grid grid-cols-6 gap-1.5">
                 {AVATAR_PRESETS.map((e) => (
                   <button

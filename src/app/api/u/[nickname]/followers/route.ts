@@ -13,10 +13,14 @@ export async function GET(
 
   const supabase = await supabaseServer();
 
-  const { data: profile, error: profErr } = await supabase
-    .rpc("public_profile", { p_nickname: nickname })
-    .maybeSingle<{ id: string; nickname: string }>();
+  const nick = decodeURIComponent(nickname ?? "").trim();
+  const { data: profRows, error: profErr } = await supabase.rpc("public_profile", {
+    p_nickname: nick,
+  });
   if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
+  const profile = (Array.isArray(profRows) ? profRows[0] : profRows) as
+    | { id: string; nickname: string }
+    | null;
   if (!profile) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   const {

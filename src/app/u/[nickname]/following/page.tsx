@@ -9,12 +9,16 @@ export default async function FollowingPage({
 }: {
   params: Promise<{ nickname: string }>;
 }) {
-  const { nickname } = await params;
+  const { nickname: rawNick } = await params;
+  const nickname = decodeURIComponent(rawNick ?? "").trim();
   const supabase = await supabaseServer();
 
-  const { data: profile } = await supabase
-    .rpc("public_profile", { p_nickname: nickname })
-    .maybeSingle<{ id: string; nickname: string }>();
+  const { data: profRows } = await supabase.rpc("public_profile", {
+    p_nickname: nickname,
+  });
+  const profile = (Array.isArray(profRows) ? profRows[0] : profRows) as
+    | { id: string; nickname: string }
+    | null;
   if (!profile) notFound();
 
   const {

@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { Flame, Users, Calendar, Settings as SettingsIcon } from "lucide-react";
 import { supabaseServer } from "@/services/supabase-server";
 import { FollowButton } from "@/components/FollowButton";
+import { AvatarView } from "@/components/AvatarView";
 
 type Profile = {
   id: string;
   nickname: string;
   avatar_emoji: string | null;
+  avatar_url: string | null;
   bio: string | null;
 };
 type Stats = {
@@ -22,20 +24,34 @@ export default async function PublicProfilePage({
 }: {
   params: Promise<{ nickname: string }>;
 }) {
-  const { nickname } = await params;
+  const { nickname: rawNick } = await params;
+  const nickname = decodeURIComponent(rawNick ?? "").trim();
+  if (!nickname) notFound();
+
   const supabase = await supabaseServer();
 
-  const { data: profile } = await supabase
-    .rpc("public_profile", { p_nickname: nickname })
-    .maybeSingle<Profile>();
+  const { data: profRows, error: profErr } = await supabase.rpc("public_profile", {
+    p_nickname: nickname,
+  });
+  if (profErr) {
+    console.error("[public_profile]", profErr);
+  }
+  const profile: Profile | null = Array.isArray(profRows)
+    ? (profRows[0] ?? null)
+    : (profRows as Profile | null);
   if (!profile) notFound();
 
-  const [{ data: stats }, authResult] = await Promise.all([
-    supabase
-      .rpc("public_stats", { p_user_id: profile.id })
-      .maybeSingle<Stats>(),
+  const [{ data: statsRows }, authResult] = await Promise.all([
+    supabase.rpc("public_stats", { p_user_id: profile.id }),
     supabase.auth.getUser(),
   ]);
+  const s: Stats =
+    (Array.isArray(statsRows) ? statsRows[0] : statsRows) ?? {
+      total_days: 0,
+      current_streak: 0,
+      followers_count: 0,
+      following_count: 0,
+    };
 
   const viewer = authResult.data.user;
   const isSelf = viewer?.id === profile.id;
@@ -50,19 +66,15 @@ export default async function PublicProfilePage({
     viewerIsFollowing = !!rel;
   }
 
-  const s = stats ?? {
-    total_days: 0,
-    current_streak: 0,
-    followers_count: 0,
-    following_count: 0,
-  };
-
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-6 flex flex-col gap-4">
       <header className="flex items-start gap-3">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-cream-100 to-brand-100 flex items-center justify-center text-3xl shrink-0 ring-1 ring-brand-100 shadow-[0_4px_12px_-4px_rgba(255,138,149,0.25)]">
-          {profile.avatar_emoji ?? "🍚"}
-        </div>
+        <AvatarView
+          url={profile.avatar_url}
+          emoji={profile.avatar_emoji}
+          size={64}
+          className="shrink-0 ring-1 ring-brand-100 shadow-[0_4px_12px_-4px_rgba(255,138,149,0.25)]"
+        />
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-black italic tracking-tight text-ink-900 truncate">

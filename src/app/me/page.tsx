@@ -27,6 +27,8 @@ type Profile = {
   goal_kcal: number | null;
   goal_type: GoalType | null;
   onboarded_at: string | null;
+  avatar_emoji: string | null;
+  avatar_url: string | null;
 };
 type Stats = {
   month: string;

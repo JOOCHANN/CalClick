@@ -4,11 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { FollowButton } from "./FollowButton";
+import { AvatarView } from "./AvatarView";
 
 type Item = {
   id: string;
   nickname: string;
   avatar_emoji: string | null;
+  avatar_url: string | null;
   followed_at: string;
   viewer_is_following: boolean;
 };
@@ -95,9 +97,12 @@ export function FollowList({ nickname, kind, viewerId }: Props) {
               href={`/u/${it.nickname}`}
               className="flex items-center gap-3 flex-1 min-w-0"
             >
-              <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cream-100 to-brand-100 flex items-center justify-center text-lg ring-1 ring-brand-100 shrink-0">
-                {it.avatar_emoji ?? "🍚"}
-              </span>
+              <AvatarView
+                url={it.avatar_url}
+                emoji={it.avatar_emoji}
+                size={40}
+                className="ring-1 ring-brand-100 shrink-0"
+              />
               <span className="text-sm font-semibold text-ink-900 truncate">
                 @{it.nickname}
               </span>
